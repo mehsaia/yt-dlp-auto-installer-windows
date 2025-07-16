@@ -1,95 +1,131 @@
 # --- Instalador Automático de yt-dlp & ffmpeg para Windows ---
 # --- @mehsaiah ---
 
+# --- FUNÇÃO DE DOWNLOAD COM BARRA DE PROGRESSO ASCII ---
+function Start-DownloadWithCoolBar {
+    param(
+        [Parameter(Mandatory=$true)] [string]$Uri,
+        [Parameter(Mandatory=$true)] [string]$OutFile,
+        [Parameter(Mandatory=$true)] [string]$Title
+    )
+    
+    Write-Host "  $Title"
+    $job = Start-BitsTransfer -Source $Uri -Destination $OutFile -Asynchronous
+    
+    while ($job.JobState -in ('Connecting', 'Transferring')) {
+        if ($job.BytesTotal -gt 0) {
+            $percent = [int](($job.BytesTransferred / $job.BytesTotal) * 100)
+            $downloadedMB = [math]::Round($job.BytesTransferred / 1MB, 2)
+            $totalMB = [math]::Round($job.BytesTotal / 1MB, 2)
+            
+            # Define o tamanho da barra de progresso
+            $barWidth = 40
+            $filledBlocks = [int](($percent / 100) * $barWidth)
+            $emptyBlocks = $barWidth - $filledBlocks
+            
+            # Cria a string da barra
+            $bar = "█" * $filledBlocks + "░" * $emptyBlocks
+            
+            # Monta a linha de status completa
+            $status = "  [$bar] $percent %  ($downloadedMB MB / $totalMB MB)"
+            
+            # Usa o carriage return `r para sobrescrever a linha
+            Write-Host -NoNewline "`r$status"
+        }
+        Start-Sleep -Milliseconds 100
+    }
+    
+    # Limpa a linha da barra de progresso e mostra a mensagem de sucesso
+    Write-Host "`r" + (" " * 80) + "`r"
+    Complete-BitsTransfer -BitsJob $job
+    Write-Host "  ✅ Download concluído com sucesso."
+}
+
 # --- INÍCIO DO SCRIPT DE INSTALAÇÃO ---
 
-# 1. DEFINIR CAMINHO DE INSTALAÇÃO E ADICIONAR AO AMBIENTE
-$InstallPath = Join-Path $HOME "yt-dlp"
-if (-not (Test-Path -Path $InstallPath)) {
-    Write-Host "`nCriando diretório de instalação em: $InstallPath"
-    New-Item -ItemType Directory -Path $InstallPath
-}
+Clear-Host
+Write-Host "============================================================" -ForegroundColor Green
+Write-Host "   Bem-vindo ao Instalador Automático para yt-dlp" -ForegroundColor White
+Write-Host "   Script por @mehsaiah" -ForegroundColor Cyan
+Write-Host "============================================================" -ForegroundColor Green
+Write-Host "`nEste script irá baixar e configurar o yt-dlp e o ffmpeg para você."
+Start-Sleep -Seconds 2
 
-$CurrentUserPath = [System.Environment]::GetEnvironmentVariable('Path', [System.EnvironmentVariableTarget]::User)
-if ($CurrentUserPath -notlike "*$InstallPath*") {
-    Write-Host "Adicionando '$InstallPath' ao seu PATH de usuário."
-    $NewPath = "$CurrentUserPath;$InstallPath"
-    [System.Environment]::SetEnvironmentVariable('Path', $NewPath, [System.EnvironmentVariableTarget]::User)
-} else {
-    Write-Host "`n✅ Seu PATH já inclui o diretório de destino."
-}
-
-# 2. INSTALAR YT-DLP
-Write-Host "`n--- Instalando yt-dlp ---"
-$YtDlpUrl = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe"
-$YtDlpExePath = Join-Path $InstallPath "yt-dlp.exe"
+# --- PASSO 1: Configurando o Ambiente ---
+Write-Host "`n--- [ PASSO 1 de 4 ] Configurando o Ambiente ---" -ForegroundColor Yellow
 try {
-    $job = Start-BitsTransfer -Source $YtDlpUrl -Destination $YtDlpExePath -DisplayName "Baixando yt-dlp.exe" -Asynchronous
-    while ($job.JobState -in ('Connecting', 'Transferring')) {
-        $progress = ($job.BytesTransferred / $job.BytesTotal) * 100
-        $downloadedMB = [math]::Round($job.BytesTransferred / 1MB, 2)
-        $totalMB = [math]::Round($job.BytesTotal / 1MB, 2)
-        Write-Progress -Activity "Baixando yt-dlp.exe" -Status "$downloadedMB MB / $totalMB MB" -PercentComplete $progress
-        Start-Sleep -Milliseconds 200
+    $InstallPath = Join-Path $HOME "yt-dlp"
+    if (-not (Test-Path -Path $InstallPath)) {
+        New-Item -ItemType Directory -Path $InstallPath
+        Write-Host "  ✅ Diretório de instalação criado em: $InstallPath"
+    } else {
+        Write-Host "  ✅ Diretório de instalação já existe."
     }
-    Write-Progress -Activity "Baixando yt-dlp.exe" -Completed
-    Complete-BitsTransfer -BitsJob $job
-    Write-Host "`n✅ Download do yt-dlp concluído com sucesso."
+
+    $CurrentUserPath = [System.Environment]::GetEnvironmentVariable('Path', [System.EnvironmentVariableTarget]::User)
+    if ($CurrentUserPath -notlike "*$InstallPath*") {
+        $NewPath = "$CurrentUserPath;$InstallPath"
+        [System.Environment]::SetEnvironmentVariable('Path', $NewPath, [System.EnvironmentVariableTarget]::User)
+        Write-Host "  ✅ Diretório adicionado ao PATH do Windows com sucesso."
+    } else {
+        Write-Host "  ✅ Diretório já configurado no PATH do Windows."
+    }
 } catch {
-    Write-Host "`n❌ Falha ao baixar o yt-dlp. Verifique sua conexão e tente novamente." -ForegroundColor Red
-    return
+    Write-Host "  ❌ Erro ao configurar o ambiente." -ForegroundColor Red; return
 }
 
-# 3. INSTALAR FFMPEG
-Write-Host "`n--- Instalando ffmpeg ---"
-$FfmpegZipUrl = "https://github.com/BtbN/FFmpeg-Builds/releases/latest/download/ffmpeg-master-latest-win64-gpl.zip"
+# --- PASSO 2: Instalando yt-dlp ---
+Write-Host "`n--- [ PASSO 2 de 4 ] Baixando yt-dlp ---" -ForegroundColor Yellow
+try {
+    $YtDlpUrl = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe"
+    $YtDlpExePath = Join-Path $InstallPath "yt-dlp.exe"
+    Start-DownloadWithCoolBar -Uri $YtDlpUrl -OutFile $YtDlpExePath -Title "Baixando yt-dlp.exe..."
+} catch {
+    Write-Host "`n  ❌ Falha ao baixar o yt-dlp. Verifique sua conexão e tente novamente." -ForegroundColor Red; return
+}
+
+# --- PASSO 3: Instalando ffmpeg ---
+Write-Host "`n--- [ PASSO 3 de 4 ] Baixando e Instalando ffmpeg ---" -ForegroundColor Yellow
 $TempZipFile = Join-Path $env:TEMP "ffmpeg.zip"
 $TempExtractPath = Join-Path $env:TEMP "ffmpeg-extraido"
 try {
-    $job = Start-BitsTransfer -Source $FfmpegZipUrl -Destination $TempZipFile -DisplayName "Baixando ffmpeg.zip" -Asynchronous
-    while ($job.JobState -in ('Connecting', 'Transferring')) {
-        $progress = ($job.BytesTransferred / $job.BytesTotal) * 100
-        $downloadedMB = [math]::Round($job.BytesTransferred / 1MB, 2)
-        $totalMB = [math]::Round($job.BytesTotal / 1MB, 2)
-        Write-Progress -Activity "Baixando ffmpeg.zip" -Status "$downloadedMB MB / $totalMB MB" -PercentComplete $progress
-        Start-Sleep -Milliseconds 200
-    }
-    Write-Progress -Activity "Baixando ffmpeg.zip" -Completed
-    Complete-BitsTransfer -BitsJob $job
-
-    Write-Host "`nExtraindo arquivos..."
+    $FfmpegZipUrl = "https://github.com/BtbN/FFmpeg-Builds/releases/latest/download/ffmpeg-master-latest-win64-gpl.zip"
+    Start-DownloadWithCoolBar -Uri $FfmpegZipUrl -OutFile $TempZipFile -Title "Baixando ffmpeg.zip (arquivo grande)..."
+    
+    Write-Host "  Descompactando arquivos..."
     Expand-Archive -Path $TempZipFile -DestinationPath $TempExtractPath -Force
+    
     $BinDir = Get-ChildItem -Path $TempExtractPath -Directory | Select-Object -First 1
     Copy-Item -Path (Join-Path $BinDir.FullName "bin\ffmpeg.exe") -Destination $InstallPath
     Copy-Item -Path (Join-Path $BinDir.FullName "bin\ffprobe.exe") -Destination $InstallPath
-    Write-Host "✅ ffmpeg instalado com sucesso."
+    Write-Host "  ✅ ffmpeg instalado com sucesso."
 } catch {
-    Write-Host "`n❌ Falha ao instalar o ffmpeg. Verifique sua conexão e tente novamente." -ForegroundColor Red
+    Write-Host "`n  ❌ Falha ao instalar o ffmpeg." -ForegroundColor Red
 } finally {
-    Write-Host "Limpando arquivos temporários..."
+    Write-Host "  Limpando arquivos temporários..."
     if (Test-Path -Path $TempZipFile) { Remove-Item $TempZipFile -Force }
     if (Test-Path -Path $TempExtractPath) { Remove-Item $TempExtractPath -Recurse -Force }
 }
 
-# 4. CRIAR ARQUIVO DE CONFIGURAÇÃO (yt-dlp.conf)
-Write-Host "`n--- Criando arquivo de configuração padrão ---"
-$ConfigContent = @"
-# ======================================================
-# ARQUIVO DE CONFIGURAÇÃO PADRÃO PARA YT-DLP
-# ======================================================
+# --- PASSO 4: Criando Arquivo de Configuração ---
+Write-Host "`n--- [ PASSO 4 de 4 ] Criando Arquivo de Configuração ---" -ForegroundColor Yellow
+try {
+    $ConfigContent = @"
+# Configuração Padrão para yt-dlp por @mehsaiah
 -P "~/Documents/yt-dlp"
 -f "bv[vcodec^=hvc1][height>1080]+ba / bv[vcodec^=avc1][height<=1080]+ba / bv*+ba / b"
 --remux-video mp4
 "@
-$ConfPath = Join-Path $InstallPath "yt-dlp.conf"
-try {
+    $ConfPath = Join-Path $InstallPath "yt-dlp.conf"
     Set-Content -Path $ConfPath -Value $ConfigContent
-    Write-Host "✅ Arquivo de configuração (yt-dlp.conf) criado com sucesso."
+    Write-Host "  ✅ Arquivo de configuração 'yt-dlp.conf' criado."
 } catch {
-    Write-Host "❌ Falha ao criar o arquivo de configuração." -ForegroundColor Red
+    Write-Host "  ❌ Falha ao criar o arquivo de configuração." -ForegroundColor Red
 }
 
-# 5. INSTRUÇÕES FINAIS
-Write-Host "`n🎉 Instalação e configuração concluídas!" -ForegroundColor Green
-Write-Host "Script por @mehsaiah" -ForegroundColor DarkGray
-Write-Host "IMPORTANTE: Você deve REINICIAR seu terminal para que as alterações tenham efeito." -ForegroundColor Yellow
+# --- Mensagem Final ---
+Write-Host "`n============================================================" -ForegroundColor Green
+Write-Host "   🎉 Instalação e Configuração Concluídas! 🎉" -ForegroundColor White
+Write-Host "============================================================" -ForegroundColor Green
+Write-Host "\nIMPORTANTE: Você deve REINICIAR seu terminal (PowerShell, CMD, etc.)" -ForegroundColor Yellow
+Write-Host "para que as alterações tenham efeito." -ForegroundColor Yellow
