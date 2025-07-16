@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Instala e configura o yt-dlp e o FFmpeg, e cria comandos personalizados para uso simplificado.
+    Instala e configura o yt-dlp e o FFmpeg, usando o sistema de presets nativo.
 
 .DESCRIPTION
     Este script automatiza todo o processo de configuração:
@@ -10,14 +10,13 @@
     4. Baixa ambos com uma barra de progresso ASCII customizada que exibe a velocidade.
     5. Extrai o FFmpeg e coloca todos os executáveis em um único diretório.
     6. Adiciona este diretório à variável de ambiente PATH do usuário.
-    7. Cria um arquivo yt-dlp.conf para garantir a máxima compatibilidade dos vídeos.
-    8. Adiciona os comandos 'yt' e 'yt1080' ao seu perfil do PowerShell para downloads fáceis.
-    9. Fornece atualizações de status claras durante todo o processo.
+    7. Cria um arquivo de configuração principal para a melhor qualidade e um preset '1080' para downloads em 1080p.
+    8. Este método não depende de perfis do PowerShell, evitando problemas de política de execução.
 
 .NOTES
     Autor: Gemini
     Handle: @mehsaiah
-    Versão: 2.1 (PT-BR) - Corrigido erro de parsing de variável.
+    Versão: 3.0 (PT-BR) - Usando sistema de presets do yt-dlp.
 #>
 
 #Requer -Versão 5.1
@@ -30,6 +29,7 @@ $installName = "yt-dlp-suite"
 $installDir = Join-Path $env:LOCALAPPDATA $installName
 $downloadDir = Join-Path ([Environment]::GetFolderPath('MyDocuments')) "Downloads\yt-dlp"
 $ytDlpConfigDir = Join-Path $env:APPDATA "yt-dlp"
+$presetsDir = Join-Path $ytDlpConfigDir "presets"
 
 # --- FUNÇÕES AUXILIARES ---
 
@@ -49,7 +49,7 @@ Function Show-WelcomeScreen {
     1. Instalar o yt-dlp & FFmpeg mais recentes em:
        $installDir
     2. Adicioná-los ao seu PATH de usuário.
-    3. Criar os comandos 'yt' e 'yt1080' para uso fácil.
+    3. Criar uma configuração padrão (melhor qualidade) e um preset '1080'.
     4. Configurar o yt-dlp para salvar vídeos em:
        $downloadDir
 
@@ -74,7 +74,6 @@ Function Pause-Script {
 Function Write-Step {
     param([int]$Step, [string]$Message)
     Write-Host ("`n" + "═" * 60)
-    # CORREÇÃO: Variáveis envolvidas em {} para evitar erros de parsing com o ':'
     Write-Host "✅ PASSO ${Step}: $Message" -ForegroundColor Green
     Write-Host ("-" * 60 + "`n")
 }
@@ -166,6 +165,12 @@ try {
     } else {
         Write-Host "   - O diretório de configuração do yt-dlp já existe: $ytDlpConfigDir"
     }
+    if (-not (Test-Path $presetsDir)) {
+        New-Item -Path $presetsDir -ItemType Directory | Out-Null
+        Write-Host "   - Diretório de presets criado: $presetsDir"
+    } else {
+        Write-Host "   - O diretório de presets já existe: $presetsDir"
+    }
 
     # PASSO 2: Baixar o yt-dlp
     Write-Step -Step 2 -Message "Baixando a versão mais recente do yt-dlp..."
@@ -238,71 +243,43 @@ try {
         Write-Host "   - '$installDir' já está no seu PATH. Nenhuma alteração necessária."
     }
 
-    # PASSO 6: Criar o arquivo yt-dlp.conf
-    Write-Step -Step 6 -Message "Criando arquivo de configuração base para o yt-dlp..."
-    $configFile = Join-Path $ytDlpConfigDir "yt-dlp.conf"
+    # PASSO 6: Criar arquivos de configuração e presets
+    Write-Step -Step 6 -Message "Criando arquivos de configuração e presets..."
     
-    $configContent = @"
-# --- Configuração Base gerada automaticamente por Gemini para @mehsaiah ---
-# Este arquivo define as opções que serão usadas por TODOS os comandos (yt, yt1080, etc)
+    # Arquivo de configuração principal (para melhor qualidade)
+    $mainConfigFile = Join-Path $ytDlpConfigDir "yt-dlp.conf"
+    $mainConfigContent = @"
+# --- Configuração Principal gerada por Gemini para @mehsaiah ---
+# Baixa a MELHOR qualidade de vídeo e áudio disponível por padrão.
+-f "bv*+ba/b"
 
+# --- Opções de Pós-Processamento (Comum a todos os presets) ---
 # Define o caminho de saída padrão para uma pasta em seus Downloads
 -o "$($downloadDir.Replace('\', '/'))/%(title)s [%(id)s].%(ext)s"
 
 # Junta em um contêiner MP4 se streams separados foram baixados
 --merge-output-format mp4
 
-# --- PÓS-PROCESSAMENTO PARA COMPATIBILIDADE COM PREMIERE PRO ---
-
-# Incorpora a thumbnail nos metadados do vídeo
+# Incorpora a thumbnail e metadados nos vídeos
 --embed-thumbnail
-
-# Incorpora os metadados do vídeo
 --embed-metadata
 
-# Recodifica o vídeo para H.264 (AVC) para máxima compatibilidade com editores de vídeo.
+# Recodifica para H.264 (AVC) e áudio AAC para máxima compatibilidade com Premiere Pro
 --postprocessor-args "FFmpegVideoConvertor:-c:v libx264 -pix_fmt yuv420p -preset slow -crf 18"
-
-# Converte o áudio para AAC de alta qualidade, o padrão para vídeo MP4
 --postprocessor-args "FFmpegAudioConvertor:-c:a aac -b:a 256k"
 "@
+    Set-Content -Path $mainConfigFile -Value $mainConfigContent -Encoding UTF8
+    Write-Host "   - Arquivo de configuração principal criado em: $mainConfigFile"
 
-    Set-Content -Path $configFile -Value $configContent -Encoding UTF8
-    Write-Host "   - Arquivo de configuração base criado em: $configFile"
-    Write-Host "   - Todos os downloads serão salvos como arquivos MP4 de alta qualidade e compatíveis com editores."
-
-    # PASSO 7: Criar comandos personalizados no Perfil do PowerShell
-    Write-Step -Step 7 "Criando comandos personalizados (yt, yt1080)..."
-    
-    # Garante que o arquivo de perfil do PowerShell exista
-    if (-not (Test-Path $PROFILE)) {
-        New-Item -Path $PROFILE -ItemType File -Force | Out-Null
-        Write-Host "   - Arquivo de perfil do PowerShell criado em: $PROFILE"
-    }
-
-    $profileContent = Get-Content $PROFILE -Raw -ErrorAction SilentlyContinue
-
-    $functionsToAdd = @"
-
-# --- Comandos personalizados para yt-dlp por @mehsaiah ---
-# Função principal: Baixa a MELHOR qualidade de vídeo e áudio disponível
-function yt {
-    yt-dlp.exe -f "bv*+ba/b" @args
-}
-
-# Função secundária: Baixa a melhor qualidade ATÉ 1080p
-function yt1080 {
-    yt-dlp.exe -f "bv*[height<=1080]+ba/b" @args
-}
-# --- Fim dos comandos personalizados ---
+    # Arquivo de preset para 1080p
+    $preset1080File = Join-Path $presetsDir "1080.conf"
+    $preset1080Content = @"
+# --- Preset 1080p ---
+# Sobrescreve a seleção de formato para baixar a melhor qualidade ATÉ 1080p.
+-f "bv*[height<=1080]+ba/b"
 "@
-
-    if ($profileContent -notlike "*# --- Comandos personalizados para yt-dlp*") {
-        Add-Content -Path $PROFILE -Value $functionsToAdd
-        Write-Host "   - Comandos 'yt' e 'yt1080' adicionados ao seu perfil do PowerShell."
-    } else {
-        Write-Host "   - Comandos personalizados já parecem existir no seu perfil. Nenhuma alteração feita."
-    }
+    Set-Content -Path $preset1080File -Value $preset1080Content -Encoding UTF8
+    Write-Host "   - Preset '1080' criado em: $preset1080File"
 
 
     # --- FINALIZAÇÃO ---
@@ -312,13 +289,14 @@ function yt1080 {
     Write-Host "Resumo:"
     Write-Host " - yt-dlp, ffmpeg e ffprobe estão instalados em '$installDir'"
     Write-Host " - Seu PATH foi atualizado."
-    Write-Host " - Comandos personalizados 'yt' e 'yt1080' foram adicionados ao seu perfil."
+    Write-Host " - A configuração padrão baixa a melhor qualidade possível."
+    Write-Host " - Um preset '1080' foi criado para downloads em 1080p."
     Write-Host " - O local de download padrão é '$downloadDir'"
     Write-Host ""
-    Write-Host "IMPORTANTE: Por favor, REINICIE seu terminal PowerShell para usar os novos comandos." -ForegroundColor Yellow
+    Write-Host "IMPORTANTE: Por favor, REINICIE seu terminal PowerShell para usar o comando 'yt-dlp'." -ForegroundColor Yellow
     Write-Host "Após reiniciar, você pode simplesmente executar:"
-    Write-Host "  yt <URL_DO_VIDEO>       (para a melhor qualidade disponível)" -ForegroundColor Cyan
-    Write-Host "  yt1080 <URL_DO_VIDEO>   (para qualidade até 1080p)" -ForegroundColor Cyan
+    Write-Host "  yt-dlp <URL_DO_VIDEO>               (para a melhor qualidade disponível)" -ForegroundColor Cyan
+    Write-Host "  yt-dlp -P 1080 <URL_DO_VIDEO>       (para qualidade até 1080p)" -ForegroundColor Cyan
 
 
 } catch {
