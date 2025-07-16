@@ -24,7 +24,16 @@ Write-Host "`n--- Instalando yt-dlp ---"
 $YtDlpUrl = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe"
 $YtDlpExePath = Join-Path $InstallPath "yt-dlp.exe"
 try {
-    Start-BitsTransfer -Source $YtDlpUrl -Destination $YtDlpExePath -DisplayName "Baixando yt-dlp.exe" -Description "yt-dlp"
+    $job = Start-BitsTransfer -Source $YtDlpUrl -Destination $YtDlpExePath -DisplayName "Baixando yt-dlp.exe" -Asynchronous
+    while ($job.JobState -in ('Connecting', 'Transferring')) {
+        $progress = ($job.BytesTransferred / $job.BytesTotal) * 100
+        $downloadedMB = [math]::Round($job.BytesTransferred / 1MB, 2)
+        $totalMB = [math]::Round($job.BytesTotal / 1MB, 2)
+        Write-Progress -Activity "Baixando yt-dlp.exe" -Status "$downloadedMB MB / $totalMB MB" -PercentComplete $progress
+        Start-Sleep -Milliseconds 200
+    }
+    Write-Progress -Activity "Baixando yt-dlp.exe" -Completed
+    Complete-BitsTransfer -BitsJob $job
     Write-Host "`n✅ Download do yt-dlp concluído com sucesso."
 } catch {
     Write-Host "`n❌ Falha ao baixar o yt-dlp. Verifique sua conexão e tente novamente." -ForegroundColor Red
@@ -37,7 +46,17 @@ $FfmpegZipUrl = "https://github.com/BtbN/FFmpeg-Builds/releases/latest/download/
 $TempZipFile = Join-Path $env:TEMP "ffmpeg.zip"
 $TempExtractPath = Join-Path $env:TEMP "ffmpeg-extraido"
 try {
-    Start-BitsTransfer -Source $FfmpegZipUrl -Destination $TempZipFile -DisplayName "Baixando ffmpeg.zip" -Description "ffmpeg"
+    $job = Start-BitsTransfer -Source $FfmpegZipUrl -Destination $TempZipFile -DisplayName "Baixando ffmpeg.zip" -Asynchronous
+    while ($job.JobState -in ('Connecting', 'Transferring')) {
+        $progress = ($job.BytesTransferred / $job.BytesTotal) * 100
+        $downloadedMB = [math]::Round($job.BytesTransferred / 1MB, 2)
+        $totalMB = [math]::Round($job.BytesTotal / 1MB, 2)
+        Write-Progress -Activity "Baixando ffmpeg.zip" -Status "$downloadedMB MB / $totalMB MB" -PercentComplete $progress
+        Start-Sleep -Milliseconds 200
+    }
+    Write-Progress -Activity "Baixando ffmpeg.zip" -Completed
+    Complete-BitsTransfer -BitsJob $job
+
     Write-Host "`nExtraindo arquivos..."
     Expand-Archive -Path $TempZipFile -DestinationPath $TempExtractPath -Force
     $BinDir = Get-ChildItem -Path $TempExtractPath -Directory | Select-Object -First 1
