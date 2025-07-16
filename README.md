@@ -43,7 +43,7 @@ A execução do script é muito simples. Siga estes passos:
    * Copie e cole o seguinte comando no PowerShell e pressione Enter. Este comando baixa e executa o script diretamente.
 
    ```powershell
-   iex (irm '[https://raw.githubusercontent.com/mehsaia/yt-dlp-auto-installer-windows/refs/heads/main/ytdlp-script](https://raw.githubusercontent.com/mehsaia/yt-dlp-auto-installer-windows/refs/heads/main/ytdlp-script)')
+   iex (irm 'https://raw.githubusercontent.com/mehsaia/yt-dlp-auto-installer-windows/refs/heads/main/ytdlp-script')
    ```
 
    > **Nota:** O comando `irm` é um apelido para `Invoke-RestMethod`, que baixa o conteúdo do script da internet. O comando `iex` (apelido para `Invoke-Expression`) executa o script baixado.
