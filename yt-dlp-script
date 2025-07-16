@@ -32,6 +32,7 @@ function Start-DownloadWithCoolBar {
     
     Write-Host "`r" + (" " * 80) + "`r"
     Complete-BitsTransfer -BitsJob $job
+    Start-Sleep -Milliseconds 500 # Pequeno atraso para garantir que o arquivo seja liberado
     Write-Host "  ✅ Download concluído com sucesso."
 }
 
@@ -55,7 +56,6 @@ try {
     } else {
         Write-Host "  ✅ Diretório de instalação já existe."
     }
-
     $CurrentUserPath = [System.Environment]::GetEnvironmentVariable('Path', [System.EnvironmentVariableTarget]::User)
     if ($CurrentUserPath -notlike "*$InstallPath*") {
         $NewPath = "$CurrentUserPath;$InstallPath"
@@ -74,47 +74,62 @@ try {
     $YtDlpUrl = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe"
     $YtDlpExePath = Join-Path $InstallPath "yt-dlp.exe"
     Start-DownloadWithCoolBar -Uri $YtDlpUrl -OutFile $YtDlpExePath -Title "Baixando yt-dlp.exe..."
+    if (-not (Test-Path $YtDlpExePath)) { throw "O download do yt-dlp.exe falhou." }
 } catch {
     Write-Host "`n  ❌ Falha ao baixar o yt-dlp. Erro: $($_.Exception.Message)" -ForegroundColor Red; return
 }
 
-# --- PASSO 3: Instalando ffmpeg ---
+# --- PASSO 3: Instalando ffmpeg com Retentativas ---
 Write-Host "`n--- [ PASSO 3 de 4 ] Baixando e Instalando ffmpeg ---" -ForegroundColor Yellow
 $TempZipFile = Join-Path $env:TEMP "ffmpeg.zip"
 $TempExtractPath = Join-Path $env:TEMP "ffmpeg-extraido"
-try {
-    $FfmpegZipUrl = "https://github.com/BtbN/FFmpeg-Builds/releases/latest/download/ffmpeg-master-latest-win64-gpl.zip"
-    Start-DownloadWithCoolBar -Uri $FfmpegZipUrl -OutFile $TempZipFile -Title "Baixando ffmpeg.zip (arquivo grande)..."
-    
-    Write-Host "  Descompactando arquivos..."
-    Expand-Archive -Path $TempZipFile -DestinationPath $TempExtractPath -Force
-    
-    $BinDir = Get-ChildItem -Path $TempExtractPath -Directory | Select-Object -First 1
-    Copy-Item -Path (Join-Path $BinDir.FullName "bin\ffmpeg.exe") -Destination $InstallPath
-    Copy-Item -Path (Join-Path $BinDir.FullName "bin\ffprobe.exe") -Destination $InstallPath
-    Write-Host "  ✅ ffmpeg instalado com sucesso."
-} catch {
-    Write-Host "`n  ❌ Falha ao instalar o ffmpeg. Erro: $($_.Exception.Message)" -ForegroundColor Red
-} finally {
-    Write-Host "  Limpando arquivos temporários..."
-    if (Test-Path -Path $TempZipFile) { Remove-Item $TempZipFile -Force }
-    if (Test-Path -Path $TempExtractPath) { Remove-Item $TempExtractPath -Recurse -Force }
+$maxRetries = 3
+$downloadSuccess = $false
+
+for ($retry = 1; $retry -le $maxRetries; $retry++) {
+    try {
+        if ($retry -gt 1) {
+            Write-Host "`n  ⚠️  Download falhou. Tentando novamente ($retry/$maxRetries)..." -ForegroundColor Yellow
+            Start-Sleep -Seconds 5
+        }
+        $FfmpegZipUrl = "https://github.com/BtbN/FFmpeg-Builds/releases/latest/download/ffmpeg-master-latest-win64-gpl.zip"
+        Start-DownloadWithCoolBar -Uri $FfmpegZipUrl -OutFile $TempZipFile -Title "Baixando ffmpeg.zip (arquivo grande)..."
+        if (Test-Path $TempZipFile) {
+            $downloadSuccess = $true
+            break # Sai do loop se o download for bem-sucedido
+        }
+    } catch {
+        Write-Host "`n  (Erro na tentativa $retry: $($_.Exception.Message))" -ForegroundColor Gray
+    }
 }
+
+if ($downloadSuccess) {
+    try {
+        Write-Host "  Descompactando arquivos..."
+        Expand-Archive -Path $TempZipFile -DestinationPath $TempExtractPath -Force
+        $BinDir = Get-ChildItem -Path $TempExtractPath -Directory | Select-Object -First 1
+        Copy-Item -Path (Join-Path $BinDir.FullName "bin\ffmpeg.exe") -Destination $InstallPath
+        Copy-Item -Path (Join-Path $BinDir.FullName "bin\ffprobe.exe") -Destination $InstallPath
+        Write-Host "  ✅ ffmpeg instalado com sucesso."
+    } catch {
+        Write-Host "`n  ❌ Falha ao descompactar ou copiar o ffmpeg. Erro: $($_.Exception.Message)" -ForegroundColor Red
+    }
+} else {
+    Write-Host "`n  ❌ Falha ao baixar o ffmpeg após $maxRetries tentativas. Verifique sua conexão com a internet." -ForegroundColor Red
+}
+
+# Limpeza final dos arquivos temporários
+if (Test-Path -Path $TempZipFile) { Remove-Item $TempZipFile -Force }
+if (Test-Path -Path $TempExtractPath) { Remove-Item $TempExtractPath -Recurse -Force }
+
 
 # --- PASSO 4: Criando Arquivo de Configuração ---
 Write-Host "`n--- [ PASSO 4 de 4 ] Criando Arquivo de Configuração ---" -ForegroundColor Yellow
 try {
     $ConfigContent = @"
 # Configuração Padrão para yt-dlp por @mehsaiah
-# Salva os arquivos em Documentos/yt-dlp
 -P "~/Documents/yt-dlp"
-
-# Seleciona o melhor vídeo e melhor áudio, independente do formato original.
 -f "bv*+ba/b"
-
-# Recodifica o vídeo para o formato MP4.
-# Isso garante que o vídeo seja H.264 e o áudio seja AAC,
-# para máxima compatibilidade com softwares de edição.
 --recode-video mp4
 "@
     $ConfPath = Join-Path $InstallPath "yt-dlp.conf"
