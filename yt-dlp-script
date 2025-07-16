@@ -75,7 +75,7 @@ try {
     $YtDlpExePath = Join-Path $InstallPath "yt-dlp.exe"
     Start-DownloadWithCoolBar -Uri $YtDlpUrl -OutFile $YtDlpExePath -Title "Baixando yt-dlp.exe..."
 } catch {
-    Write-Host "`n  ❌ Falha ao baixar o yt-dlp. Verifique sua conexão e tente novamente." -ForegroundColor Red; return
+    Write-Host "`n  ❌ Falha ao baixar o yt-dlp. Erro: $($_.Exception.Message)" -ForegroundColor Red; return
 }
 
 # --- PASSO 3: Instalando ffmpeg ---
@@ -94,7 +94,7 @@ try {
     Copy-Item -Path (Join-Path $BinDir.FullName "bin\ffprobe.exe") -Destination $InstallPath
     Write-Host "  ✅ ffmpeg instalado com sucesso."
 } catch {
-    Write-Host "`n  ❌ Falha ao instalar o ffmpeg." -ForegroundColor Red
+    Write-Host "`n  ❌ Falha ao instalar o ffmpeg. Erro: $($_.Exception.Message)" -ForegroundColor Red
 } finally {
     Write-Host "  Limpando arquivos temporários..."
     if (Test-Path -Path $TempZipFile) { Remove-Item $TempZipFile -Force }
