@@ -18,24 +18,18 @@ function Start-DownloadWithCoolBar {
             $downloadedMB = [math]::Round($job.BytesTransferred / 1MB, 2)
             $totalMB = [math]::Round($job.BytesTotal / 1MB, 2)
             
-            # Define o tamanho da barra de progresso
             $barWidth = 40
             $filledBlocks = [int](($percent / 100) * $barWidth)
             $emptyBlocks = $barWidth - $filledBlocks
             
-            # Cria a string da barra
             $bar = "█" * $filledBlocks + "░" * $emptyBlocks
-            
-            # Monta a linha de status completa
             $status = "  [$bar] $percent %  ($downloadedMB MB / $totalMB MB)"
             
-            # Usa o carriage return `r para sobrescrever a linha
             Write-Host -NoNewline "`r$status"
         }
         Start-Sleep -Milliseconds 100
     }
     
-    # Limpa a linha da barra de progresso e mostra a mensagem de sucesso
     Write-Host "`r" + (" " * 80) + "`r"
     Complete-BitsTransfer -BitsJob $job
     Write-Host "  ✅ Download concluído com sucesso."
@@ -112,9 +106,15 @@ Write-Host "`n--- [ PASSO 4 de 4 ] Criando Arquivo de Configuração ---" -Foreg
 try {
     $ConfigContent = @"
 # Configuração Padrão para yt-dlp por @mehsaiah
+# Salva os arquivos em Documentos/yt-dlp
 -P "~/Documents/yt-dlp"
+
+# Seleciona o melhor vídeo (H265/H264) e o melhor áudio
 -f "bv[vcodec^=hvc1][height>1080]+ba / bv[vcodec^=avc1][height<=1080]+ba / bv*+ba / b"
---remux-video mp4
+
+# Recodifica o vídeo para o container MP4.
+# Isso FORÇA a conversão do áudio para AAC se for incompatível (como Opus).
+--recode-video mp4
 "@
     $ConfPath = Join-Path $InstallPath "yt-dlp.conf"
     Set-Content -Path $ConfPath -Value $ConfigContent
