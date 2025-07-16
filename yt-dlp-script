@@ -1,93 +1,70 @@
-# --- yt-dlp & ffmpeg Auto-Installer for Windows ---
+# --- Instalador Automático de yt-dlp & ffmpeg para Windows ---
 # --- @mehsaiah ---
 
-Write-Host @"
+# --- INÍCIO DO SCRIPT ---
 
-                                           .                                                        
-         .     .:'         * '             
-     o     _.::'  '              .       . .  |                 ' |         +   
-          (_.'              +      +     .  --o--               --o--     +     
- * .-.                    |     +             |             
-           .        ' ( (                              '                        
-    .                  `-'                                                    . 
-         . .   '  .                           .                       * .                                     ' * .       .          * + 
-                  oo                                        ~~+                 
-                .:'      o                                   .                  
-    '       _.::'                             .     * (_.'                              * '          * +.    
- * .           .                                                  .       .   
-        * '                     o          .                        .        
-         o    . |                       '                                       
-               -o-           .                    +  +             .            
-      * |            '                   * '.                   *.  
-                                                         * .      .    +  
-         .           .                +     +   '                               
-
-"@ -ForegroundColor Cyan
-
-# --- SCRIPT START ---
-
-# 1. DEFINE INSTALLATION PATH AND ADD TO ENVIRONMENT
+# 1. DEFINIR CAMINHO DE INSTALAÇÃO E ADICIONAR AO AMBIENTE
 $InstallPath = Join-Path $HOME "yt-dlp"
 if (-not (Test-Path -Path $InstallPath)) {
-    Write-Host "`nCreating installation directory at: $InstallPath"
+    Write-Host "`nCriando diretório de instalação em: $InstallPath"
     New-Item -ItemType Directory -Path $InstallPath
 }
 
 $CurrentUserPath = [System.Environment]::GetEnvironmentVariable('Path', [System.EnvironmentVariableTarget]::User)
 if ($CurrentUserPath -notlike "*$InstallPath*") {
-    Write-Host "Adding '$InstallPath' to your user PATH."
+    Write-Host "Adicionando '$InstallPath' ao seu PATH de usuário."
     $NewPath = "$CurrentUserPath;$InstallPath"
     [System.Environment]::SetEnvironmentVariable('Path', $NewPath, [System.EnvironmentVariableTarget]::User)
 } else {
-    Write-Host "`n✅ Your PATH already includes the target directory."
+    Write-Host "`n✅ Seu PATH já inclui o diretório de destino."
 }
 
-# 2. INSTALL YT-DLP
-Write-Host "`n--- Installing yt-dlp ---"
+# 2. INSTALAR YT-DLP
+Write-Host "`n--- Instalando yt-dlp ---"
 $YtDlpUrl = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe"
 $YtDlpExePath = Join-Path $InstallPath "yt-dlp.exe"
 try {
     Invoke-WebRequest -Uri $YtDlpUrl -OutFile $YtDlpExePath -UseBasicParsing
-    Write-Host "✅ yt-dlp downloaded successfully."
+    Write-Host "✅ Download do yt-dlp concluído com sucesso."
 } catch {
-    Write-Host "❌ Failed to download yt-dlp. Please check your connection and try again." -ForegroundColor Red
+    Write-Host "❌ Falha ao baixar o yt-dlp. Verifique sua conexão com a internet e tente novamente." -ForegroundColor Red
     return
 }
 
-# 3. INSTALL FFMPEG
-Write-Host "`n--- Installing ffmpeg ---"
-# Using the trusted BtbN builds in .zip format for easy extraction
+# 3. INSTALAR FFMPEG
+Write-Host "`n--- Instalando ffmpeg ---"
+# Usando as compilações confiáveis do BtbN em formato .zip para extração fácil
 $FfmpegZipUrl = "https://github.com/BtbN/FFmpeg-Builds/releases/latest/download/ffmpeg-master-latest-win64-gpl.zip"
 $TempZipFile = Join-Path $env:TEMP "ffmpeg.zip"
-$TempExtractPath = Join-Path $env:TEMP "ffmpeg-extracted"
+$TempExtractPath = Join-Path $env:TEMP "ffmpeg-extraido"
 
 try {
     # Download
-    Write-Host "Downloading ffmpeg.zip (this may take a moment)..."
+    Write-Host "Baixando ffmpeg.zip (isso pode levar um momento)..."
     Invoke-WebRequest -Uri $FfmpegZipUrl -OutFile $TempZipFile -UseBasicParsing
     
-    # Extract
-    Write-Host "Extracting files..."
+    # Extração
+    Write-Host "Extraindo arquivos..."
     Expand-Archive -Path $TempZipFile -DestinationPath $TempExtractPath -Force
     
-    # Find the bin directory and copy executables
+    # Encontrar o diretório 'bin' e copiar os executáveis
     $BinDir = Get-ChildItem -Path $TempExtractPath -Directory | Select-Object -First 1
     Copy-Item -Path (Join-Path $BinDir.FullName "bin\ffmpeg.exe") -Destination $InstallPath
     Copy-Item -Path (Join-Path $BinDir.FullName "bin\ffprobe.exe") -Destination $InstallPath
 
-    Write-Host "✅ ffmpeg installed successfully."
+    Write-Host "✅ ffmpeg instalado com sucesso."
     
 } catch {
-    Write-Host "❌ Failed to install ffmpeg. Error: $($_.Exception.Message)" -ForegroundColor Red
+    Write-Host "❌ Falha ao instalar o ffmpeg. Erro: $($_.Exception.Message)" -ForegroundColor Red
 } finally {
-    # Cleanup temporary files
-    Write-Host "Cleaning up temporary files..."
+    # Limpeza de arquivos temporários
+    Write-Host "Limpando arquivos temporários..."
     if (Test-Path -Path $TempZipFile) { Remove-Item $TempZipFile -Force }
     if (Test-Path -Path $TempExtractPath) { Remove-Item $TempExtractPath -Recurse -Force }
 }
 
-# 4. FINAL INSTRUCTIONS
-Write-Host "`n🎉 Installation complete for both yt-dlp and ffmpeg!" -ForegroundColor Green
-Write-Host "Script by @mehsaiah" -ForegroundColor DarkGray
-Write-Host "IMPORTANT: You must RESTART your terminal (PowerShell, CMD, etc.) for the changes to take effect." -ForegroundColor Yellow
-Write-Host "After restarting, you can run 'yt-dlp' and 'ffmpeg' from any command line."
+# 4. INSTRUÇÕES FINAIS
+Write-Host "`n🎉 Instalação do yt-dlp e ffmpeg concluída!" -ForegroundColor Green
+Write-Host "Script por @mehsaiah" -ForegroundColor DarkGray
+Write-Host "IMPORTANTE: Você deve REINICIAR seu terminal (PowerShell, CMD, etc.) para que as alterações tenham efeito." -ForegroundColor Yellow
+Write-Host "Após reiniciar, você poderá executar 'yt-dlp' e 'ffmpeg' de qualquer linha de comando."
