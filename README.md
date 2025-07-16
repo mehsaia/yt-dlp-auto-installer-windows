@@ -28,6 +28,8 @@ O script foi desenvolvido para ser executado uma única vez, configurando tudo o
 
 * **PowerShell 5.1** ou superior (já vem instalado por padrão no Windows).
 
+* Uma conexão com a internet.
+
 ## 🚀 Como Usar
 
 A execução do script é muito simples. Siga estes passos:
@@ -40,8 +42,8 @@ A execução do script é muito simples. Siga estes passos:
 
    * Copie e cole o seguinte comando no PowerShell e pressione Enter. Este comando baixa e executa o script diretamente.
 
-   ```
-  iex (irm 'https://raw.githubusercontent.com/mehsaia/yt-dlp-auto-installer-windows/refs/heads/main/ytdlp-script')
+   ```powershell
+   iex (irm '[https://raw.githubusercontent.com/mehsaia/yt-dlp-auto-installer-windows/refs/heads/main/ytdlp-script](https://raw.githubusercontent.com/mehsaia/yt-dlp-auto-installer-windows/refs/heads/main/ytdlp-script)')
    ```
 
    > **Nota:** O comando `irm` é um apelido para `Invoke-RestMethod`, que baixa o conteúdo do script da internet. O comando `iex` (apelido para `Invoke-Expression`) executa o script baixado.
@@ -62,20 +64,18 @@ Depois de reiniciar o PowerShell, você pode começar a baixar vídeos com os se
 
 Use o comando `yt-dlp` seguido da URL do vídeo. Ele pegará a melhor resolução disponível (4K, 8K, etc.).
 
-```
+```powershell
 # Exemplo
 yt-dlp [https://www.youtube.com/watch?v=dQw4w9WgXcQ](https://www.youtube.com/watch?v=dQw4w9WgXcQ)
-
 ```
 
 ### Para Qualidade até 1080p
 
 Se você não precisa da resolução máxima e quer um arquivo menor, use o preset `1080` com a flag `-P`.
 
-```
+```powershell
 # Exemplo
 yt-dlp -P 1080 [https://www.youtube.com/watch?v=dQw4w9WgXcQ](https://www.youtube.com/watch?v=dQw4w9WgXcQ)
-
 ```
 
 Todos os vídeos serão processados e salvos na pasta `C:\Users\SEU_USUARIO\Downloads\yt-dlp`.
@@ -90,9 +90,8 @@ Todos os vídeos serão processados e salvos na pasta `C:\Users\SEU_USUARIO\Down
 
   * Se o PowerShell impedir a execução do script inicial, você pode precisar alterar sua política de execução. Abra o PowerShell como **Administrador** e execute:
 
-  ```
+  ```powershell
   Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
-  
   ```
 
   Depois, tente executar o comando de instalação novamente em uma janela normal do PowerShell.
