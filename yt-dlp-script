@@ -99,7 +99,9 @@ for ($retry = 1; $retry -le $maxRetries; $retry++) {
             break # Sai do loop se o download for bem-sucedido
         }
     } catch {
-        Write-Host "`n  (Erro na tentativa $retry: $($_.Exception.Message))" -ForegroundColor Gray
+        # CORREÇÃO: Constrói a string de erro de forma segura antes de exibi-la.
+        $errorMessage = "`n  (Erro na tentativa {0}: {1})" -f $retry, $_.Exception.Message
+        Write-Host $errorMessage -ForegroundColor Gray
     }
 }
 
