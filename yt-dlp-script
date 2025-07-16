@@ -39,21 +39,14 @@ $TempZipFile = Join-Path $env:TEMP "ffmpeg.zip"
 $TempExtractPath = Join-Path $env:TEMP "ffmpeg-extraido"
 
 try {
-    # Download
     Write-Host "Baixando ffmpeg.zip (isso pode levar um momento)..."
     Invoke-WebRequest -Uri $FfmpegZipUrl -OutFile $TempZipFile -UseBasicParsing
-    
-    # Extração
     Write-Host "Extraindo arquivos..."
     Expand-Archive -Path $TempZipFile -DestinationPath $TempExtractPath -Force
-    
-    # Encontrar o diretório 'bin' e copiar os executáveis
     $BinDir = Get-ChildItem -Path $TempExtractPath -Directory | Select-Object -First 1
     Copy-Item -Path (Join-Path $BinDir.FullName "bin\ffmpeg.exe") -Destination $InstallPath
     Copy-Item -Path (Join-Path $BinDir.FullName "bin\ffprobe.exe") -Destination $InstallPath
-
     Write-Host "✅ ffmpeg instalado com sucesso."
-    
 } catch {
     Write-Host "❌ Falha ao instalar o ffmpeg. Erro: $($_.Exception.Message)" -ForegroundColor Red
 } finally {
@@ -63,8 +56,48 @@ try {
     if (Test-Path -Path $TempExtractPath) { Remove-Item $TempExtractPath -Recurse -Force }
 }
 
-# 4. INSTRUÇÕES FINAIS
-Write-Host "`n🎉 Instalação do yt-dlp e ffmpeg concluída!" -ForegroundColor Green
+# 4. CRIAR ARQUIVO DE CONFIGURAÇÃO (yt-dlp.conf)
+Write-Host "`n--- Criando arquivo de configuração padrão ---"
+$ConfigContent = @"
+# ======================================================
+# ARQUIVO DE CONFIGURAÇÃO PADRÃO PARA YT-DLP
+# ======================================================
+
+# --- DESTINO ---
+# Salva todos os arquivos na pasta 'yt-dlp' dentro de Documentos.
+-P "~/Documents/yt-dlp"
+
+# --- SELEÇÃO DE FORMATO ---
+# Seleciona o melhor codec de vídeo com base na resolução e o melhor áudio.
+# 1. Para vídeos > 1080p, prefere H.265/HEVC.
+# 2. Para vídeos <= 1080p, prefere H.264/AVC.
+# 3. Se os codecs específicos não forem encontrados, baixa a melhor qualidade disponível.
+-f "bv*[vcodec~=^h265][height>1080]+ba / bv*[vcodec~=^h264][height<=1080]+ba / bv*+ba / b"
+
+# --- FORMATO DE SAÍDA ---
+# Sempre salva o arquivo final como .mp4 para máxima compatibilidade.
+--remux-video mp4
+
+# --- QUALIDADE DE ÁUDIO ---
+# A seleção padrão 'ba' (bestaudio) geralmente resulta em Opus ou AAC de alta qualidade.
+# Para obter áudio sem perdas (lossless) em formato FLAC (arquivos maiores),
+# remova o '#' da linha abaixo.
+# -x --audio-format flac
+"@
+
+$ConfPath = Join-Path $InstallPath "yt-dlp.conf"
+try {
+    Set-Content -Path $ConfPath -Value $ConfigContent
+    Write-Host "✅ Arquivo de configuração (yt-dlp.conf) criado com sucesso."
+    Write-Host "   - Os vídeos serão salvos em: Documentos\yt-dlp" -ForegroundColor Green
+    Write-Host "   - Formato padrão: MP4 (H.265 para >1080p, H.264 para <=1080p) com o melhor áudio." -ForegroundColor Green
+} catch {
+    Write-Host "❌ Falha ao criar o arquivo de configuração." -ForegroundColor Red
+}
+
+
+# 5. INSTRUÇÕES FINAIS
+Write-Host "`n🎉 Instalação e configuração concluídas!" -ForegroundColor Green
 Write-Host "Script por @mehsaiah" -ForegroundColor DarkGray
 Write-Host "IMPORTANTE: Você deve REINICIAR seu terminal (PowerShell, CMD, etc.) para que as alterações tenham efeito." -ForegroundColor Yellow
-Write-Host "Após reiniciar, você poderá executar 'yt-dlp' e 'ffmpeg' de qualquer linha de comando."
+Write-Host "Após reiniciar, apenas 'yt-dlp URL' usará automaticamente suas novas configurações."
