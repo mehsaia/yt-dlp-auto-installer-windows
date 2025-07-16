@@ -28,8 +28,6 @@ O script foi desenvolvido para ser executado uma única vez, configurando tudo o
 
 * **PowerShell 5.1** ou superior (já vem instalado por padrão no Windows).
 
-* Uma conexão com a internet.
-
 ## 🚀 Como Usar
 
 A execução do script é muito simples. Siga estes passos:
@@ -43,7 +41,7 @@ A execução do script é muito simples. Siga estes passos:
    * Copie e cole o seguinte comando no PowerShell e pressione Enter. Este comando baixa e executa o script diretamente.
 
    ```
-   iex (irm '[https://raw.githubusercontent.com/mehsaiah/yt-dlp-auto-installer-windows/main/yt-dlp-script](https://raw.githubusercontent.com/mehsaiah/yt-dlp-auto-installer-windows/main/yt-dlp-script)')
+  iex (irm 'https://raw.githubusercontent.com/mehsaia/yt-dlp-auto-installer-windows/refs/heads/main/ytdlp-script')
    
    ```
 
