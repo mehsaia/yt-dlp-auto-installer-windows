@@ -16,7 +16,7 @@
 .NOTES
     Autor: Gemini
     Handle: @mehsaiah
-    Versão: 3.0 (PT-BR) - Usando sistema de presets do yt-dlp.
+    Versão: 3.1 (PT-BR) - Corrigida a lógica da barra de progresso.
 #>
 
 #Requer -Versão 5.1
@@ -90,31 +90,37 @@ Function Invoke-DownloadWithProgress {
     Write-Host "   💾 Salvando em: $OutFile"
 
     $webClient = New-Object System.Net.WebClient
-    $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
-    $lastBytes = 0
-    $lastTime = $stopwatch.Elapsed
+    
+    # Variáveis para o event handler, com escopo de script para garantir que sejam acessíveis.
+    $script:stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
+    $script:lastBytes = 0
+    $script:lastTime = $script:stopwatch.Elapsed
+    $script:speedText = "--- KB/s"
 
     # Registra um bloco de script para lidar com o evento de progresso
     $progressAction = {
         param($sender, $e)
+        
         $bytesReceived = $e.BytesReceived
         $totalBytes = $e.TotalBytesToReceive
         $percentage = if ($totalBytes -gt 0) { [math]::Round(($bytesReceived / $totalBytes) * 100) } else { 0 }
 
         # Calcula a velocidade do download
-        $currentTime = $stopwatch.Elapsed
-        $timeSpan = $currentTime - $lastTime
+        $currentTime = $script:stopwatch.Elapsed
+        $timeSpan = $currentTime - $script:lastTime
+        
         if ($timeSpan.TotalSeconds -gt 0.5) {
-            $bytesSinceLast = $bytesReceived - $lastBytes
+            $bytesSinceLast = $bytesReceived - $script:lastBytes
             $speed = $bytesSinceLast / $timeSpan.TotalSeconds
-            $lastBytes = $bytesReceived
-            $lastTime = $currentTime
-
-            $speedText = if ($speed -gt 1MB) {
+            
+            $script:speedText = if ($speed -gt 1MB) {
                 "{0:N2} MB/s" -f ($speed / 1MB)
             } else {
                 "{0:N2} KB/s" -f ($speed / 1KB)
             }
+            
+            $script:lastBytes = $bytesReceived
+            $script:lastTime = $currentTime
         }
 
         # Constrói a barra de progresso ASCII
@@ -125,18 +131,26 @@ Function Invoke-DownloadWithProgress {
         $progressBar = ('█' * $completedWidth) + ('-' * $remainingWidth)
 
         Write-Progress -Activity "Baixando Arquivo" -Status "$percentage% Completo" -PercentComplete $percentage
-        Write-Host -NoNewline "`r   [$progressBar] $percentage% ($speedText)    "
+        Write-Host -NoNewline "`r   [$progressBar] $percentage% ($($script:speedText))    "
     }
+    
     Register-ObjectEvent -InputObject $webClient -EventName DownloadProgressChanged -Action $progressAction -SourceIdentifier "DownloadProgress" | Out-Null
     
     try {
         $webClient.DownloadFile($Url, $OutFile)
-        $stopwatch.Stop()
+        $script:stopwatch.Stop()
         Write-Host "`n   ✔️ Download concluído!"
-    } finally {
+    }
+    catch {
+        # Propaga o erro para ser pego pelo bloco try/catch principal
+        throw $_
+    }
+    finally {
         Unregister-Event -SourceIdentifier "DownloadProgress"
         $webClient.Dispose()
         Write-Progress -Activity "Baixando Arquivo" -Completed
+        # Limpa as variáveis de escopo de script para não poluir a sessão
+        Remove-Variable -Name "stopwatch", "lastBytes", "lastTime", "speedText" -Scope Script -ErrorAction SilentlyContinue
     }
 }
 
