@@ -1,0 +1,93 @@
+# --- yt-dlp & ffmpeg Auto-Installer for Windows ---
+# --- @mehsaiah ---
+
+Write-Host @"
+
+                                           .                                                        
+         .     .:'         * '             
+     o     _.::'  '              .       . .  |                 ' |         +   
+          (_.'              +      +     .  --o--               --o--     +     
+ * .-.                    |     +             |             
+           .        ' ( (                              '                        
+    .                  `-'                                                    . 
+         . .   '  .                           .                       * .                                     ' * .       .          * + 
+                  oo                                        ~~+                 
+                .:'      o                                   .                  
+    '       _.::'                             .     * (_.'                              * '          * +.    
+ * .           .                                                  .       .   
+        * '                     o          .                        .        
+         o    . |                       '                                       
+               -o-           .                    +  +             .            
+      * |            '                   * '.                   *.  
+                                                         * .      .    +  
+         .           .                +     +   '                               
+
+"@ -ForegroundColor Cyan
+
+# --- SCRIPT START ---
+
+# 1. DEFINE INSTALLATION PATH AND ADD TO ENVIRONMENT
+$InstallPath = Join-Path $HOME "yt-dlp"
+if (-not (Test-Path -Path $InstallPath)) {
+    Write-Host "`nCreating installation directory at: $InstallPath"
+    New-Item -ItemType Directory -Path $InstallPath
+}
+
+$CurrentUserPath = [System.Environment]::GetEnvironmentVariable('Path', [System.EnvironmentVariableTarget]::User)
+if ($CurrentUserPath -notlike "*$InstallPath*") {
+    Write-Host "Adding '$InstallPath' to your user PATH."
+    $NewPath = "$CurrentUserPath;$InstallPath"
+    [System.Environment]::SetEnvironmentVariable('Path', $NewPath, [System.EnvironmentVariableTarget]::User)
+} else {
+    Write-Host "`n✅ Your PATH already includes the target directory."
+}
+
+# 2. INSTALL YT-DLP
+Write-Host "`n--- Installing yt-dlp ---"
+$YtDlpUrl = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe"
+$YtDlpExePath = Join-Path $InstallPath "yt-dlp.exe"
+try {
+    Invoke-WebRequest -Uri $YtDlpUrl -OutFile $YtDlpExePath -UseBasicParsing
+    Write-Host "✅ yt-dlp downloaded successfully."
+} catch {
+    Write-Host "❌ Failed to download yt-dlp. Please check your connection and try again." -ForegroundColor Red
+    return
+}
+
+# 3. INSTALL FFMPEG
+Write-Host "`n--- Installing ffmpeg ---"
+# Using the trusted BtbN builds in .zip format for easy extraction
+$FfmpegZipUrl = "https://github.com/BtbN/FFmpeg-Builds/releases/latest/download/ffmpeg-master-latest-win64-gpl.zip"
+$TempZipFile = Join-Path $env:TEMP "ffmpeg.zip"
+$TempExtractPath = Join-Path $env:TEMP "ffmpeg-extracted"
+
+try {
+    # Download
+    Write-Host "Downloading ffmpeg.zip (this may take a moment)..."
+    Invoke-WebRequest -Uri $FfmpegZipUrl -OutFile $TempZipFile -UseBasicParsing
+    
+    # Extract
+    Write-Host "Extracting files..."
+    Expand-Archive -Path $TempZipFile -DestinationPath $TempExtractPath -Force
+    
+    # Find the bin directory and copy executables
+    $BinDir = Get-ChildItem -Path $TempExtractPath -Directory | Select-Object -First 1
+    Copy-Item -Path (Join-Path $BinDir.FullName "bin\ffmpeg.exe") -Destination $InstallPath
+    Copy-Item -Path (Join-Path $BinDir.FullName "bin\ffprobe.exe") -Destination $InstallPath
+
+    Write-Host "✅ ffmpeg installed successfully."
+    
+} catch {
+    Write-Host "❌ Failed to install ffmpeg. Error: $($_.Exception.Message)" -ForegroundColor Red
+} finally {
+    # Cleanup temporary files
+    Write-Host "Cleaning up temporary files..."
+    if (Test-Path -Path $TempZipFile) { Remove-Item $TempZipFile -Force }
+    if (Test-Path -Path $TempExtractPath) { Remove-Item $TempExtractPath -Recurse -Force }
+}
+
+# 4. FINAL INSTRUCTIONS
+Write-Host "`n🎉 Installation complete for both yt-dlp and ffmpeg!" -ForegroundColor Green
+Write-Host "Script by @mehsaiah" -ForegroundColor DarkGray
+Write-Host "IMPORTANT: You must RESTART your terminal (PowerShell, CMD, etc.) for the changes to take effect." -ForegroundColor Yellow
+Write-Host "After restarting, you can run 'yt-dlp' and 'ffmpeg' from any command line."
