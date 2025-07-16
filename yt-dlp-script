@@ -17,7 +17,7 @@
 .NOTES
     Autor: Gemini
     Handle: @mehsaiah
-    Versão: 2.0 (PT-BR)
+    Versão: 2.1 (PT-BR) - Corrigido erro de parsing de variável.
 #>
 
 #Requer -Versão 5.1
@@ -74,7 +74,8 @@ Function Pause-Script {
 Function Write-Step {
     param([int]$Step, [string]$Message)
     Write-Host ("`n" + "═" * 60)
-    Write-Host "✅ PASSO $Step: $Message" -ForegroundColor Green
+    # CORREÇÃO: Variáveis envolvidas em {} para evitar erros de parsing com o ':'
+    Write-Host "✅ PASSO ${Step}: $Message" -ForegroundColor Green
     Write-Host ("-" * 60 + "`n")
 }
 
