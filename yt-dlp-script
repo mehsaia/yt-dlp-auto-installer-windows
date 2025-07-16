@@ -112,13 +112,10 @@ try {
 # Seleciona o melhor vídeo e melhor áudio, independente do formato original.
 -f "bv*+ba/b"
 
-# Garante que o container final seja MP4.
---merge-output-format mp4
-
-# Argumentos para o pós-processador (ffmpeg):
-# -c:v copy => Copia o stream de vídeo sem recodificar (rápido).
-# -c:a aac => Recodifica APENAS o áudio para AAC (compatível com Premiere).
---postprocessor-args "Merger:-c:v copy -c:a aac"
+# Recodifica o vídeo para o formato MP4.
+# Isso garante que o vídeo seja H.264 e o áudio seja AAC,
+# para máxima compatibilidade com softwares de edição.
+--recode-video mp4
 "@
     $ConfPath = Join-Path $InstallPath "yt-dlp.conf"
     Set-Content -Path $ConfPath -Value $ConfigContent
