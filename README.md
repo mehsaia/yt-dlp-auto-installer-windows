@@ -22,6 +22,8 @@ iex (irm 'https://raw.githubusercontent.com/mehsaia/yt-dlp-auto-installer-window
 
 Após a conclusão do script, você **precisa reiniciar** o seu terminal (fechar e reabrir qualquer janela do PowerShell ou do Prompt de Comando) para que as alterações no PATH entrem em vigor.
 
+# yt-dlp & ffmpeg Auto-Installer for Windows
+
 A simple and effective PowerShell script to automatically download the latest versions of `yt-dlp` and `ffmpeg`, and add them to your Windows PATH. This allows you to run `yt-dlp` and `ffmpeg` from any terminal (CMD, PowerShell, etc.) without manual setup.
 
 ## What This Script Does
