@@ -1,55 +1,6 @@
 # --- Instalador Automático de yt-dlp & ffmpeg para Windows ---
 # --- @mehsaiah ---
 
-# --- FUNÇÃO DE DOWNLOAD CUSTOMIZADA ---
-function Start-DownloadWithProgress {
-    param(
-        [Parameter(Mandatory=$true)]
-        [string]$Uri,
-        [Parameter(Mandatory=$true)]
-        [string]$OutFile,
-        [string]$Title = "Baixando Arquivo"
-    )
-
-    $webClient = New-Object System.Net.WebClient
-    $stopwatch = New-Object System.Diagnostics.Stopwatch
-
-    # Evento para atualizar a barra de progresso
-    $script:bytesDownloaded = 0
-    $webClient.DownloadProgressChanged({
-        $totalBytes = $_.TotalBytesToReceive
-        if ($totalBytes -gt 0) {
-            $percentComplete = [math]::Round(($_.BytesReceived / $totalBytes) * 100)
-            $downloadedMB = [math]::Round($_.BytesReceived / 1MB, 2)
-            $totalMB = [math]::Round($totalBytes / 1MB, 2)
-            
-            # Calcular velocidade de download
-            $elapsedSeconds = $stopwatch.Elapsed.TotalSeconds
-            if ($elapsedSeconds -gt 0) {
-                $speedKBps = [math]::Round(($_.BytesReceived / 1024) / $elapsedSeconds, 0)
-                $status = "Baixado $downloadedMB MB de $totalMB MB ($percentComplete %) - Velocidade: $speedKBps KB/s"
-            } else {
-                $status = "Baixado $downloadedMB MB de $totalMB MB ($percentComplete %)"
-            }
-            
-            Write-Progress -Activity $Title -Status $status -PercentComplete $percentComplete
-        }
-    })
-
-    try {
-        $stopwatch.Start()
-        $webClient.DownloadFileTaskAsync($Uri, $OutFile).Wait()
-        $stopwatch.Stop()
-        Write-Progress -Activity $Title -Status "Concluído." -Completed
-    } catch {
-        Write-Host "`n❌ Erro durante o download de '$Uri'. Detalhes: $($_.Exception.Message)" -ForegroundColor Red
-        throw # Lança o erro para parar o script
-    } finally {
-        $webClient.Dispose()
-    }
-}
-
-
 # --- INÍCIO DO SCRIPT DE INSTALAÇÃO ---
 
 # 1. DEFINIR CAMINHO DE INSTALAÇÃO E ADICIONAR AO AMBIENTE
@@ -69,29 +20,32 @@ if ($CurrentUserPath -notlike "*$InstallPath*") {
 }
 
 # 2. INSTALAR YT-DLP
+Write-Host "`n--- Instalando yt-dlp ---"
 $YtDlpUrl = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe"
 $YtDlpExePath = Join-Path $InstallPath "yt-dlp.exe"
 try {
-    Start-DownloadWithProgress -Uri $YtDlpUrl -OutFile $YtDlpExePath -Title "Baixando yt-dlp.exe"
-    Write-Host "✅ Download do yt-dlp concluído com sucesso."
+    Start-BitsTransfer -Source $YtDlpUrl -Destination $YtDlpExePath -DisplayName "Baixando yt-dlp.exe" -Description "yt-dlp"
+    Write-Host "`n✅ Download do yt-dlp concluído com sucesso."
 } catch {
-    return # Para o script se o download falhar
+    Write-Host "`n❌ Falha ao baixar o yt-dlp. Verifique sua conexão e tente novamente." -ForegroundColor Red
+    return
 }
 
 # 3. INSTALAR FFMPEG
+Write-Host "`n--- Instalando ffmpeg ---"
 $FfmpegZipUrl = "https://github.com/BtbN/FFmpeg-Builds/releases/latest/download/ffmpeg-master-latest-win64-gpl.zip"
 $TempZipFile = Join-Path $env:TEMP "ffmpeg.zip"
 $TempExtractPath = Join-Path $env:TEMP "ffmpeg-extraido"
 try {
-    Start-DownloadWithProgress -Uri $FfmpegZipUrl -OutFile $TempZipFile -Title "Baixando ffmpeg.zip"
-    Write-Host "Extraindo arquivos..."
+    Start-BitsTransfer -Source $FfmpegZipUrl -Destination $TempZipFile -DisplayName "Baixando ffmpeg.zip" -Description "ffmpeg"
+    Write-Host "`nExtraindo arquivos..."
     Expand-Archive -Path $TempZipFile -DestinationPath $TempExtractPath -Force
     $BinDir = Get-ChildItem -Path $TempExtractPath -Directory | Select-Object -First 1
     Copy-Item -Path (Join-Path $BinDir.FullName "bin\ffmpeg.exe") -Destination $InstallPath
     Copy-Item -Path (Join-Path $BinDir.FullName "bin\ffprobe.exe") -Destination $InstallPath
     Write-Host "✅ ffmpeg instalado com sucesso."
 } catch {
-    Write-Host "❌ Falha ao instalar o ffmpeg." -ForegroundColor Red
+    Write-Host "`n❌ Falha ao instalar o ffmpeg. Verifique sua conexão e tente novamente." -ForegroundColor Red
 } finally {
     Write-Host "Limpando arquivos temporários..."
     if (Test-Path -Path $TempZipFile) { Remove-Item $TempZipFile -Force }
