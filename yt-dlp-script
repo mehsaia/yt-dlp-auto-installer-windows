@@ -1,10 +1,56 @@
 # --- Instalador Automático de yt-dlp & ffmpeg para Windows ---
 # --- @mehsaiah ---
 
-# --- INÍCIO DO SCRIPT ---
+# --- FUNÇÃO DE DOWNLOAD CUSTOMIZADA ---
+function Start-DownloadWithProgress {
+    param(
+        [Parameter(Mandatory=$true)]
+        [string]$Uri,
+        [Parameter(Mandatory=$true)]
+        [string]$OutFile,
+        [string]$Title = "Baixando Arquivo"
+    )
 
-# Garante que a barra de progresso seja exibida para os downloads.
-$ProgressPreference = 'Continue'
+    $webClient = New-Object System.Net.WebClient
+    $stopwatch = New-Object System.Diagnostics.Stopwatch
+
+    # Evento para atualizar a barra de progresso
+    $script:bytesDownloaded = 0
+    $webClient.DownloadProgressChanged({
+        $totalBytes = $_.TotalBytesToReceive
+        if ($totalBytes -gt 0) {
+            $percentComplete = [math]::Round(($_.BytesReceived / $totalBytes) * 100)
+            $downloadedMB = [math]::Round($_.BytesReceived / 1MB, 2)
+            $totalMB = [math]::Round($totalBytes / 1MB, 2)
+            
+            # Calcular velocidade de download
+            $elapsedSeconds = $stopwatch.Elapsed.TotalSeconds
+            if ($elapsedSeconds -gt 0) {
+                $speedKBps = [math]::Round(($_.BytesReceived / 1024) / $elapsedSeconds, 0)
+                $status = "Baixado $downloadedMB MB de $totalMB MB ($percentComplete %) - Velocidade: $speedKBps KB/s"
+            } else {
+                $status = "Baixado $downloadedMB MB de $totalMB MB ($percentComplete %)"
+            }
+            
+            Write-Progress -Activity $Title -Status $status -PercentComplete $percentComplete
+        }
+    })
+
+    try {
+        $stopwatch.Start()
+        $webClient.DownloadFileTaskAsync($Uri, $OutFile).Wait()
+        $stopwatch.Stop()
+        Write-Progress -Activity $Title -Status "Concluído." -Completed
+    } catch {
+        Write-Host "`n❌ Erro durante o download de '$Uri'. Detalhes: $($_.Exception.Message)" -ForegroundColor Red
+        throw # Lança o erro para parar o script
+    } finally {
+        $webClient.Dispose()
+    }
+}
+
+
+# --- INÍCIO DO SCRIPT DE INSTALAÇÃO ---
 
 # 1. DEFINIR CAMINHO DE INSTALAÇÃO E ADICIONAR AO AMBIENTE
 $InstallPath = Join-Path $HOME "yt-dlp"
@@ -23,27 +69,21 @@ if ($CurrentUserPath -notlike "*$InstallPath*") {
 }
 
 # 2. INSTALAR YT-DLP
-Write-Host "`n--- Instalando yt-dlp ---"
 $YtDlpUrl = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe"
 $YtDlpExePath = Join-Path $InstallPath "yt-dlp.exe"
 try {
-    Invoke-WebRequest -Uri $YtDlpUrl -OutFile $YtDlpExePath
+    Start-DownloadWithProgress -Uri $YtDlpUrl -OutFile $YtDlpExePath -Title "Baixando yt-dlp.exe"
     Write-Host "✅ Download do yt-dlp concluído com sucesso."
 } catch {
-    Write-Host "❌ Falha ao baixar o yt-dlp. Verifique sua conexão com a internet e tente novamente." -ForegroundColor Red
-    return
+    return # Para o script se o download falhar
 }
 
 # 3. INSTALAR FFMPEG
-Write-Host "`n--- Instalando ffmpeg ---"
-# Usando as compilações confiáveis do BtbN em formato .zip para extração fácil
 $FfmpegZipUrl = "https://github.com/BtbN/FFmpeg-Builds/releases/latest/download/ffmpeg-master-latest-win64-gpl.zip"
 $TempZipFile = Join-Path $env:TEMP "ffmpeg.zip"
 $TempExtractPath = Join-Path $env:TEMP "ffmpeg-extraido"
-
 try {
-    Write-Host "Baixando ffmpeg.zip (isso pode levar um momento)..."
-    Invoke-WebRequest -Uri $FfmpegZipUrl -OutFile $TempZipFile
+    Start-DownloadWithProgress -Uri $FfmpegZipUrl -OutFile $TempZipFile -Title "Baixando ffmpeg.zip"
     Write-Host "Extraindo arquivos..."
     Expand-Archive -Path $TempZipFile -DestinationPath $TempExtractPath -Force
     $BinDir = Get-ChildItem -Path $TempExtractPath -Directory | Select-Object -First 1
@@ -51,9 +91,8 @@ try {
     Copy-Item -Path (Join-Path $BinDir.FullName "bin\ffprobe.exe") -Destination $InstallPath
     Write-Host "✅ ffmpeg instalado com sucesso."
 } catch {
-    Write-Host "❌ Falha ao instalar o ffmpeg. Erro: $($_.Exception.Message)" -ForegroundColor Red
+    Write-Host "❌ Falha ao instalar o ffmpeg." -ForegroundColor Red
 } finally {
-    # Limpeza de arquivos temporários
     Write-Host "Limpando arquivos temporários..."
     if (Test-Path -Path $TempZipFile) { Remove-Item $TempZipFile -Force }
     if (Test-Path -Path $TempExtractPath) { Remove-Item $TempExtractPath -Recurse -Force }
@@ -65,42 +104,19 @@ $ConfigContent = @"
 # ======================================================
 # ARQUIVO DE CONFIGURAÇÃO PADRÃO PARA YT-DLP
 # ======================================================
-
-# --- DESTINO ---
-# Salva todos os arquivos na pasta 'yt-dlp' dentro de Documentos.
 -P "~/Documents/yt-dlp"
-
-# --- SELEÇÃO DE FORMATO ---
-# Seleciona o melhor codec de vídeo com base na resolução e o melhor áudio.
-# 1. Para vídeos > 1080p, prefere H.265/HEVC (hvc1).
-# 2. Para vídeos <= 1080p, prefere H.264/AVC (avc1).
-# 3. Se os codecs específicos não forem encontrados, baixa a melhor qualidade disponível.
 -f "bv[vcodec^=hvc1][height>1080]+ba / bv[vcodec^=avc1][height<=1080]+ba / bv*+ba / b"
-
-# --- FORMATO DE SAÍDA ---
-# Sempre salva o arquivo final como .mp4 para máxima compatibilidade.
 --remux-video mp4
-
-# --- QUALIDADE DE ÁUDIO ---
-# A seleção padrão 'ba' (bestaudio) geralmente resulta em Opus ou AAC de alta qualidade.
-# Para obter áudio sem perdas (lossless) em formato FLAC (arquivos maiores),
-# remova o '#' da linha abaixo.
-# -x --audio-format flac
 "@
-
 $ConfPath = Join-Path $InstallPath "yt-dlp.conf"
 try {
     Set-Content -Path $ConfPath -Value $ConfigContent
     Write-Host "✅ Arquivo de configuração (yt-dlp.conf) criado com sucesso."
-    Write-Host "   - Os vídeos serão salvos em: Documentos\yt-dlp" -ForegroundColor Green
-    Write-Host "   - Formato padrão: MP4 (H.265 para >1080p, H.264 para <=1080p) com o melhor áudio." -ForegroundColor Green
 } catch {
     Write-Host "❌ Falha ao criar o arquivo de configuração." -ForegroundColor Red
 }
 
-
 # 5. INSTRUÇÕES FINAIS
 Write-Host "`n🎉 Instalação e configuração concluídas!" -ForegroundColor Green
 Write-Host "Script por @mehsaiah" -ForegroundColor DarkGray
-Write-Host "IMPORTANTE: Você deve REINICIAR seu terminal (PowerShell, CMD, etc.) para que as alterações tenham efeito." -ForegroundColor Yellow
-Write-Host "Após reiniciar, apenas 'yt-dlp URL' usará automaticamente suas novas configurações."
+Write-Host "IMPORTANTE: Você deve REINICIAR seu terminal para que as alterações tenham efeito." -ForegroundColor Yellow
