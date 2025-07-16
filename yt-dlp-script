@@ -3,6 +3,9 @@
 
 # --- INÍCIO DO SCRIPT ---
 
+# Garante que a barra de progresso seja exibida para os downloads.
+$ProgressPreference = 'Continue'
+
 # 1. DEFINIR CAMINHO DE INSTALAÇÃO E ADICIONAR AO AMBIENTE
 $InstallPath = Join-Path $HOME "yt-dlp"
 if (-not (Test-Path -Path $InstallPath)) {
@@ -24,7 +27,7 @@ Write-Host "`n--- Instalando yt-dlp ---"
 $YtDlpUrl = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe"
 $YtDlpExePath = Join-Path $InstallPath "yt-dlp.exe"
 try {
-    Invoke-WebRequest -Uri $YtDlpUrl -OutFile $YtDlpExePath -UseBasicParsing
+    Invoke-WebRequest -Uri $YtDlpUrl -OutFile $YtDlpExePath
     Write-Host "✅ Download do yt-dlp concluído com sucesso."
 } catch {
     Write-Host "❌ Falha ao baixar o yt-dlp. Verifique sua conexão com a internet e tente novamente." -ForegroundColor Red
@@ -40,7 +43,7 @@ $TempExtractPath = Join-Path $env:TEMP "ffmpeg-extraido"
 
 try {
     Write-Host "Baixando ffmpeg.zip (isso pode levar um momento)..."
-    Invoke-WebRequest -Uri $FfmpegZipUrl -OutFile $TempZipFile -UseBasicParsing
+    Invoke-WebRequest -Uri $FfmpegZipUrl -OutFile $TempZipFile
     Write-Host "Extraindo arquivos..."
     Expand-Archive -Path $TempZipFile -DestinationPath $TempExtractPath -Force
     $BinDir = Get-ChildItem -Path $TempExtractPath -Directory | Select-Object -First 1
@@ -69,10 +72,10 @@ $ConfigContent = @"
 
 # --- SELEÇÃO DE FORMATO ---
 # Seleciona o melhor codec de vídeo com base na resolução e o melhor áudio.
-# 1. Para vídeos > 1080p, prefere H.265/HEVC.
-# 2. Para vídeos <= 1080p, prefere H.264/AVC.
+# 1. Para vídeos > 1080p, prefere H.265/HEVC (hvc1).
+# 2. Para vídeos <= 1080p, prefere H.264/AVC (avc1).
 # 3. Se os codecs específicos não forem encontrados, baixa a melhor qualidade disponível.
--f "bv*[vcodec~=^h265][height>1080]+ba / bv*[vcodec~=^h264][height<=1080]+ba / bv*+ba / b"
+-f "bv[vcodec^=hvc1][height>1080]+ba / bv[vcodec^=avc1][height<=1080]+ba / bv*+ba / b"
 
 # --- FORMATO DE SAÍDA ---
 # Sempre salva o arquivo final como .mp4 para máxima compatibilidade.
