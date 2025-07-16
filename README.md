@@ -1,51 +1,105 @@
-# Instalador Automático de yt-dlp e ffmpeg para Windows
+# yt-dlp & FFmpeg Installer Script for Windows 🚀
 
-Um script PowerShell simples e eficaz para baixar automaticamente as versões mais recentes do `yt-dlp` e `ffmpeg`, e adicioná-los ao PATH do seu Windows. Isso permite que você execute o `yt-dlp` e o `ffmpeg` de qualquer terminal (CMD, PowerShell, etc.) sem configuração manual.
+Este é um script de PowerShell completo criado para automatizar a instalação e configuração do `yt-dlp` e `FFmpeg` no Windows, com foco em criar um ambiente otimizado para edição de vídeos, especialmente no Adobe Premiere Pro.
 
-## O que este script faz
+O script foi desenvolvido para ser executado uma única vez, configurando tudo o que você precisa para começar a baixar vídeos de forma rápida e eficiente.
 
-* **Cria um Diretório**: Cria uma pasta dedicada em `C:\Users\SeuUsuario\yt-dlp` para armazenar os executáveis.
-* **Configuração do PATH**: Adiciona automaticamente esta pasta à variável de ambiente PATH do seu usuário.
-* **Baixa o yt-dlp**: Obtém o `yt-dlp.exe` mais recente do repositório oficial do GitHub.
-* **Baixa e Instala o ffmpeg**: Baixa a compilação mais recente do `ffmpeg`, extrai os arquivos necessários (`ffmpeg.exe` e `ffprobe.exe`), os coloca no diretório de instalação e limpa todos os arquivos temporários.
-* **Totalmente Automatizado**: Não é necessário baixar ou descompactar arquivos manualmente.
+## ✨ Recursos Principais
 
-## Como Usar
+* **Instalação Automatizada:** Baixa e instala as versões mais recentes do `yt-dlp` e `FFmpeg` sem intervenção manual.
 
-Abra um terminal PowerShell e execute o seguinte comando. Ele irá baixar e executar o script de instalação.
+* **Configuração de PATH:** Adiciona automaticamente as ferramentas ao PATH do seu sistema, permitindo que você as execute de qualquer local no terminal.
 
-```powershell
-iex (irm 'https://raw.githubusercontent.com/mehsaia/yt-dlp-auto-installer-windows/refs/heads/main/yt-dlp-script')
+* **Sistema de Presets:**
+
+  * O comando padrão `yt-dlp` baixa na **melhor** qualidade **disponível** (4K, 8K, etc.).
+
+  * Um preset `1080` é criado para baixar com qualidade limitada a **1080p** (`yt-dlp -P 1080 <URL>`).
+
+* **Otimizado para Editores:** A configuração padrão converte todos os vídeos para o formato **H.264 (MP4)** com áudio **AAC**, garantindo máxima compatibilidade e desempenho de edição no Adobe Premiere Pro e outros softwares.
+
+* **Interface Amigável:** Exibe uma tela de boas-vindas, informa cada passo do processo e mostra uma barra de progresso visual durante os downloads.
+
+* **Organização:** Salva todos os vídeos baixados em uma pasta dedicada `Downloads\yt-dlp` para manter sua biblioteca organizada.
+
+## 📋 Requisitos
+
+* **Windows 10 ou 11**
+
+* **PowerShell 5.1** ou superior (já vem instalado por padrão no Windows).
+
+* Uma conexão com a internet.
+
+## 🚀 Como Usar
+
+A execução do script é muito simples. Siga estes passos:
+
+1. **Abra o PowerShell:**
+
+   * Pressione `Win + R`, digite `powershell` e pressione Enter.
+
+2. **Execute o Comando de Instalação:**
+
+   * Copie e cole o seguinte comando no PowerShell e pressione Enter. Este comando baixa e executa o script diretamente.
+
+   ```
+   iex (irm '[https://raw.githubusercontent.com/mehsaiah/yt-dlp-auto-installer-windows/main/yt-dlp-script](https://raw.githubusercontent.com/mehsaiah/yt-dlp-auto-installer-windows/main/yt-dlp-script)')
+   
+   ```
+
+   > **Nota:** O comando `irm` é um apelido para `Invoke-RestMethod`, que baixa o conteúdo do script da internet. O comando `iex` (apelido para `Invoke-Expression`) executa o script baixado.
+
+3. **Siga as Instruções:**
+
+   * O script irá mostrar uma tela de boas-vindas. Pressione `Enter` para iniciar a instalação. Ele cuidará de todo o resto automaticamente.
+
+4. **Reinicie o PowerShell:**
+
+   * **Este passo é muito importante!** Após a conclusão do script, feche a janela do PowerShell e abra uma nova. Isso é necessário para que o comando `yt-dlp` seja reconhecido pelo sistema.
+
+## 🎮 Comandos de Download
+
+Depois de reiniciar o PowerShell, você pode começar a baixar vídeos com os seguintes comandos:
+
+### Para a Melhor Qualidade Possível
+
+Use o comando `yt-dlp` seguido da URL do vídeo. Ele pegará a melhor resolução disponível (4K, 8K, etc.).
+
+```
+# Exemplo
+yt-dlp [https://www.youtube.com/watch?v=dQw4w9WgXcQ](https://www.youtube.com/watch?v=dQw4w9WgXcQ)
+
 ```
 
-### Aviso Importante
+### Para Qualidade até 1080p
 
-Após a conclusão do script, você **precisa reiniciar** o seu terminal (fechar e reabrir qualquer janela do PowerShell ou do Prompt de Comando) para que as alterações no PATH entrem em vigor.
+Se você não precisa da resolução máxima e quer um arquivo menor, use o preset `1080` com a flag `-P`.
 
-# yt-dlp & ffmpeg Auto-Installer for Windows
+```
+# Exemplo
+yt-dlp -P 1080 [https://www.youtube.com/watch?v=dQw4w9WgXcQ](https://www.youtube.com/watch?v=dQw4w9WgXcQ)
 
-A simple and effective PowerShell script to automatically download the latest versions of `yt-dlp` and `ffmpeg`, and add them to your Windows PATH. This allows you to run `yt-dlp` and `ffmpeg` from any terminal (CMD, PowerShell, etc.) without manual setup.
-
-## What This Script Does
-
-* **Creates a Directory**: Makes a dedicated folder at `C:\Users\YourUsername\yt-dlp` to store the executables.
-* **PATH Configuration**: Automatically adds this folder to your user's PATH environment variable.
-* **Downloads yt-dlp**: Fetches the latest `yt-dlp.exe` from the official GitHub repository.
-* **Downloads and Installs ffmpeg**: Downloads the latest `ffmpeg` build, extracts the necessary files (`ffmpeg.exe` and `ffprobe.exe`), places them in the installation directory, and cleans up all temporary files.
-* **Fully Automated**: No manual downloading or unzipping required.
-
-## How to Use
-
-Open a PowerShell terminal and run the following command. This will download and execute the installation script.
-
-```powershell
-iex (irm 'https://raw.githubusercontent.com/mehsaia/yt-dlp-auto-installer-windows/refs/heads/main/yt-dlp-script')
 ```
 
-*Replace `YOUR_RAW_SCRIPT_URL_HERE` with the actual raw URL of your script file from GitHub Gist or your repository.*
+Todos os vídeos serão processados e salvos na pasta `C:\Users\SEU_USUARIO\Downloads\yt-dlp`.
 
-### Important Notice
+## 🔧 Solução de Problemas
 
-After the script finishes, you **must restart** your terminal (close and reopen any PowerShell or Command Prompt windows) for the PATH changes to take effect.
+* **Comando `yt-dlp` não encontrado (`Command not found`):**
 
----
+  * Isso quase sempre significa que você não reiniciou o PowerShell após a instalação. Feche todas as janelas do PowerShell e abra uma nova.
+
+* **Erro de Política de Execução (`Execution Policy`):**
+
+  * Se o PowerShell impedir a execução do script inicial, você pode precisar alterar sua política de execução. Abra o PowerShell como **Administrador** e execute:
+
+  ```
+  Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
+  
+  ```
+
+  Depois, tente executar o comando de instalação novamente em uma janela normal do PowerShell.
+
+## ❤️ Créditos
+
+Script criado e personalizado por **@mehsaiah**.
