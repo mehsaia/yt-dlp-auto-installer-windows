@@ -1,0 +1,331 @@
+<#
+.SYNOPSIS
+    Instala e configura o yt-dlp e o FFmpeg, e cria comandos personalizados para uso simplificado.
+
+.DESCRIPTION
+    Este script automatiza todo o processo de configuração:
+    1. Cria as pastas necessárias para as ferramentas e para os downloads de vídeo.
+    2. Busca a versão mais recente do yt-dlp no GitHub.
+    3. Busca a build mais recente do FFmpeg (versão GPL do BtbN).
+    4. Baixa ambos com uma barra de progresso ASCII customizada que exibe a velocidade.
+    5. Extrai o FFmpeg e coloca todos os executáveis em um único diretório.
+    6. Adiciona este diretório à variável de ambiente PATH do usuário.
+    7. Cria um arquivo yt-dlp.conf para garantir a máxima compatibilidade dos vídeos.
+    8. Adiciona os comandos 'yt' e 'yt1080' ao seu perfil do PowerShell para downloads fáceis.
+    9. Fornece atualizações de status claras durante todo o processo.
+
+.NOTES
+    Autor: Gemini
+    Handle: @mehsaiah
+    Versão: 2.1 (PT-BR) - Corrigido erro de parsing de variável.
+#>
+
+#Requer -Versão 5.1
+
+# Para a execução em caso de qualquer erro
+$ErrorActionPreference = 'Stop'
+
+# --- CONFIGURAÇÃO DO SCRIPT ---
+$installName = "yt-dlp-suite"
+$installDir = Join-Path $env:LOCALAPPDATA $installName
+$downloadDir = Join-Path ([Environment]::GetFolderPath('MyDocuments')) "Downloads\yt-dlp"
+$ytDlpConfigDir = Join-Path $env:APPDATA "yt-dlp"
+
+# --- FUNÇÕES AUXILIARES ---
+
+Function Show-WelcomeScreen {
+    Clear-Host
+    $welcomeMessage = @"
+
+  ██╗   ██╗████████╗██████╗ ██╗      ██████╗ ██████╗
+  ╚██╗ ██╔╝╚══██╔══╝██╔══██╗██║     ██╔═══██╗██╔══██╗
+   ╚████╔╝    ██║   ██║  ██║██║     ██║   ██║██████╔╝
+    ╚██╔╝     ██║   ██║  ██║██║     ██║   ██║██╔═══╝
+     ██║      ██║   ██████╔╝███████╗╚██████╔╝██║
+     ╚═╝      ╚═╝   ╚═════╝ ╚══════╝ ╚═════╝ ╚═╝
+    Instalador e Configurador para @mehsaiah
+
+    Este script irá:
+    1. Instalar o yt-dlp & FFmpeg mais recentes em:
+       $installDir
+    2. Adicioná-los ao seu PATH de usuário.
+    3. Criar os comandos 'yt' e 'yt1080' para uso fácil.
+    4. Configurar o yt-dlp para salvar vídeos em:
+       $downloadDir
+
+"@
+    Write-Host $welcomeMessage -ForegroundColor Cyan
+    Write-Host "------------------------------------------------------------------" -ForegroundColor Gray
+    Pause-Script -Message "Pressione Enter para iniciar a instalação..."
+}
+
+Function Pause-Script {
+    param([string]$Message = "Pressione Enter para continuar...")
+    Write-Host ""
+    Write-Host $Message -ForegroundColor Yellow
+    if ($Host.Name -eq 'ConsoleHost') {
+        $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown") | Out-Null
+    } else {
+        Read-Host
+    }
+    Write-Host ""
+}
+
+Function Write-Step {
+    param([int]$Step, [string]$Message)
+    Write-Host ("`n" + "═" * 60)
+    # CORREÇÃO: Variáveis envolvidas em {} para evitar erros de parsing com o ':'
+    Write-Host "✅ PASSO ${Step}: $Message" -ForegroundColor Green
+    Write-Host ("-" * 60 + "`n")
+}
+
+Function Invoke-DownloadWithProgress {
+    param(
+        [Parameter(Mandatory=$true)]
+        [string]$Url,
+        [Parameter(Mandatory=$true)]
+        [string]$OutFile
+    )
+
+    Write-Host "   🔗 Baixando de: $Url"
+    Write-Host "   💾 Salvando em: $OutFile"
+
+    $webClient = New-Object System.Net.WebClient
+    $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
+    $lastBytes = 0
+    $lastTime = $stopwatch.Elapsed
+
+    # Registra um bloco de script para lidar com o evento de progresso
+    $progressAction = {
+        param($sender, $e)
+        $bytesReceived = $e.BytesReceived
+        $totalBytes = $e.TotalBytesToReceive
+        $percentage = if ($totalBytes -gt 0) { [math]::Round(($bytesReceived / $totalBytes) * 100) } else { 0 }
+
+        # Calcula a velocidade do download
+        $currentTime = $stopwatch.Elapsed
+        $timeSpan = $currentTime - $lastTime
+        if ($timeSpan.TotalSeconds -gt 0.5) {
+            $bytesSinceLast = $bytesReceived - $lastBytes
+            $speed = $bytesSinceLast / $timeSpan.TotalSeconds
+            $lastBytes = $bytesReceived
+            $lastTime = $currentTime
+
+            $speedText = if ($speed -gt 1MB) {
+                "{0:N2} MB/s" -f ($speed / 1MB)
+            } else {
+                "{0:N2} KB/s" -f ($speed / 1KB)
+            }
+        }
+
+        # Constrói a barra de progresso ASCII
+        $barWidth = [math]::Floor([Console]::WindowWidth * 0.5)
+        if ($barWidth -lt 20) {$barWidth = 20}
+        $completedWidth = [math]::Round($barWidth * $percentage / 100)
+        $remainingWidth = $barWidth - $completedWidth
+        $progressBar = ('█' * $completedWidth) + ('-' * $remainingWidth)
+
+        Write-Progress -Activity "Baixando Arquivo" -Status "$percentage% Completo" -PercentComplete $percentage
+        Write-Host -NoNewline "`r   [$progressBar] $percentage% ($speedText)    "
+    }
+    Register-ObjectEvent -InputObject $webClient -EventName DownloadProgressChanged -Action $progressAction -SourceIdentifier "DownloadProgress" | Out-Null
+    
+    try {
+        $webClient.DownloadFile($Url, $OutFile)
+        $stopwatch.Stop()
+        Write-Host "`n   ✔️ Download concluído!"
+    } finally {
+        Unregister-Event -SourceIdentifier "DownloadProgress"
+        $webClient.Dispose()
+        Write-Progress -Activity "Baixando Arquivo" -Completed
+    }
+}
+
+# --- LÓGICA PRINCIPAL DO SCRIPT ---
+
+Show-WelcomeScreen
+
+try {
+    # PASSO 1: Criar Diretórios
+    Write-Step -Step 1 -Message "Criando os diretórios necessários..."
+    if (-not (Test-Path $installDir)) {
+        New-Item -Path $installDir -ItemType Directory | Out-Null
+        Write-Host "   - Diretório de instalação criado: $installDir"
+    } else {
+        Write-Host "   - O diretório de instalação já existe: $installDir"
+    }
+    if (-not (Test-Path $downloadDir)) {
+        New-Item -Path $downloadDir -ItemType Directory | Out-Null
+        Write-Host "   - Diretório de downloads criado: $downloadDir"
+    } else {
+        Write-Host "   - O diretório de downloads já existe: $downloadDir"
+    }
+     if (-not (Test-Path $ytDlpConfigDir)) {
+        New-Item -Path $ytDlpConfigDir -ItemType Directory | Out-Null
+        Write-Host "   - Diretório de configuração do yt-dlp criado: $ytDlpConfigDir"
+    } else {
+        Write-Host "   - O diretório de configuração do yt-dlp já existe: $ytDlpConfigDir"
+    }
+
+    # PASSO 2: Baixar o yt-dlp
+    Write-Step -Step 2 -Message "Baixando a versão mais recente do yt-dlp..."
+    $ytDlpReleaseUrl = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe"
+    $ytDlpOutFile = Join-Path $installDir "yt-dlp.exe"
+    Invoke-DownloadWithProgress -Url $ytDlpReleaseUrl -OutFile $ytDlpOutFile
+
+    # PASSO 3: Baixar o FFmpeg
+    Write-Step -Step 3 -Message "Encontrando e baixando a build mais recente do FFmpeg..."
+    $ffmpegApiUrl = "https://api.github.com/repos/BtbN/FFmpeg-Builds/releases?per_page=1"
+    Write-Host "   - Consultando a API do GitHub pela última versão do FFmpeg..."
+    $ffmpegRelease = Invoke-RestMethod -Uri $ffmpegApiUrl
+    $ffmpegAsset = $ffmpegRelease.assets | Where-Object { $_.name -like 'ffmpeg-master-latest-win64-gpl.zip' } | Select-Object -First 1
+    
+    if (-not $ffmpegAsset) {
+        throw "Não foi possível encontrar a build GPL mais recente do FFmpeg. O script pode precisar de uma atualização."
+    }
+
+    $ffmpegDownloadUrl = $ffmpegAsset.browser_download_url
+    $ffmpegZipFile = Join-Path $env:TEMP "ffmpeg.zip"
+    Invoke-DownloadWithProgress -Url $ffmpegDownloadUrl -OutFile $ffmpegZipFile
+
+    # PASSO 4: Extrair e posicionar o FFmpeg
+    Write-Step -Step 4 -Message "Extraindo o FFmpeg..."
+    $ffmpegExtractPath = Join-Path $env:TEMP "ffmpeg-extracted"
+    if (Test-Path $ffmpegExtractPath) {
+        Remove-Item -Path $ffmpegExtractPath -Recurse -Force
+    }
+    Expand-Archive -Path $ffmpegZipFile -DestinationPath $ffmpegExtractPath -Force
+    Write-Host "   - Arquivo extraído para um local temporário."
+
+    # Encontra o diretório 'bin' e move os executáveis
+    $ffmpegBinDir = Get-ChildItem -Path $ffmpegExtractPath -Directory -Filter "bin" -Recurse | Select-Object -First 1
+    if ($ffmpegBinDir) {
+        Get-ChildItem -Path $ffmpegBinDir.FullName -Filter "*.exe" | ForEach-Object {
+            Move-Item -Path $_.FullName -Destination $installDir -Force
+            Write-Host "   - $($_.Name) movido para $installDir"
+        }
+    } else {
+        throw "Não foi possível encontrar o diretório 'bin' no arquivo do FFmpeg."
+    }
+    
+    # Limpa os arquivos temporários
+    Remove-Item -Path $ffmpegZipFile -Force
+    Remove-Item -Path $ffmpegExtractPath -Recurse -Force
+    Write-Host "   - Arquivos temporários limpos."
+
+    # PASSO 5: Adicionar ao PATH do Usuário
+    Write-Step -Step 5 -Message "Adicionando o diretório de instalação ao PATH do Usuário..."
+    $pathScope = 'User'
+    $currentPath = [System.Environment]::GetEnvironmentVariable('Path', $pathScope)
+    if ($currentPath -notlike "*$installDir*") {
+        $newPath = "$currentPath;$installDir"
+        [System.Environment]::SetEnvironmentVariable('Path', $newPath, $pathScope)
+        Write-Host "   - '$installDir' adicionado com sucesso ao seu PATH."
+        Write-Host "   - ATENÇÃO: Você deve REINICIAR seu terminal para que esta alteração tenha efeito." -ForegroundColor Yellow
+        
+        # Esta linha transmite a alteração para outros aplicativos em execução
+        $HWND_BROADCAST = [IntPtr]0xffff
+        $WM_SETTINGCHANGE = 0x1a
+        Add-Type -TypeDefinition '
+        using System;
+        using System.Runtime.InteropServices;
+        public class Win32 {
+            [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)]
+            public static extern IntPtr SendMessageTimeout(IntPtr hWnd, uint Msg, UIntPtr wParam, string lParam, uint fuFlags, uint uTimeout, out UIntPtr lpdwResult);
+        }'
+        [Win32]::SendMessageTimeout($HWND_BROADCAST, $WM_SETTINGCHANGE, [UIntPtr]::Zero, "Environment", 2, 5000, [ref][UIntPtr]::Zero) | Out-Null
+    } else {
+        Write-Host "   - '$installDir' já está no seu PATH. Nenhuma alteração necessária."
+    }
+
+    # PASSO 6: Criar o arquivo yt-dlp.conf
+    Write-Step -Step 6 -Message "Criando arquivo de configuração base para o yt-dlp..."
+    $configFile = Join-Path $ytDlpConfigDir "yt-dlp.conf"
+    
+    $configContent = @"
+# --- Configuração Base gerada automaticamente por Gemini para @mehsaiah ---
+# Este arquivo define as opções que serão usadas por TODOS os comandos (yt, yt1080, etc)
+
+# Define o caminho de saída padrão para uma pasta em seus Downloads
+-o "$($downloadDir.Replace('\', '/'))/%(title)s [%(id)s].%(ext)s"
+
+# Junta em um contêiner MP4 se streams separados foram baixados
+--merge-output-format mp4
+
+# --- PÓS-PROCESSAMENTO PARA COMPATIBILIDADE COM PREMIERE PRO ---
+
+# Incorpora a thumbnail nos metadados do vídeo
+--embed-thumbnail
+
+# Incorpora os metadados do vídeo
+--embed-metadata
+
+# Recodifica o vídeo para H.264 (AVC) para máxima compatibilidade com editores de vídeo.
+--postprocessor-args "FFmpegVideoConvertor:-c:v libx264 -pix_fmt yuv420p -preset slow -crf 18"
+
+# Converte o áudio para AAC de alta qualidade, o padrão para vídeo MP4
+--postprocessor-args "FFmpegAudioConvertor:-c:a aac -b:a 256k"
+"@
+
+    Set-Content -Path $configFile -Value $configContent -Encoding UTF8
+    Write-Host "   - Arquivo de configuração base criado em: $configFile"
+    Write-Host "   - Todos os downloads serão salvos como arquivos MP4 de alta qualidade e compatíveis com editores."
+
+    # PASSO 7: Criar comandos personalizados no Perfil do PowerShell
+    Write-Step -Step 7 "Criando comandos personalizados (yt, yt1080)..."
+    
+    # Garante que o arquivo de perfil do PowerShell exista
+    if (-not (Test-Path $PROFILE)) {
+        New-Item -Path $PROFILE -ItemType File -Force | Out-Null
+        Write-Host "   - Arquivo de perfil do PowerShell criado em: $PROFILE"
+    }
+
+    $profileContent = Get-Content $PROFILE -Raw -ErrorAction SilentlyContinue
+
+    $functionsToAdd = @"
+
+# --- Comandos personalizados para yt-dlp por @mehsaiah ---
+# Função principal: Baixa a MELHOR qualidade de vídeo e áudio disponível
+function yt {
+    yt-dlp.exe -f "bv*+ba/b" @args
+}
+
+# Função secundária: Baixa a melhor qualidade ATÉ 1080p
+function yt1080 {
+    yt-dlp.exe -f "bv*[height<=1080]+ba/b" @args
+}
+# --- Fim dos comandos personalizados ---
+"@
+
+    if ($profileContent -notlike "*# --- Comandos personalizados para yt-dlp*") {
+        Add-Content -Path $PROFILE -Value $functionsToAdd
+        Write-Host "   - Comandos 'yt' e 'yt1080' adicionados ao seu perfil do PowerShell."
+    } else {
+        Write-Host "   - Comandos personalizados já parecem existir no seu perfil. Nenhuma alteração feita."
+    }
+
+
+    # --- FINALIZAÇÃO ---
+    Write-Host ("`n" + "═" * 60)
+    Write-Host "🎉 TUDO PRONTO! 🎉" -ForegroundColor Magenta
+    Write-Host ("═" * 60 + "`n")
+    Write-Host "Resumo:"
+    Write-Host " - yt-dlp, ffmpeg e ffprobe estão instalados em '$installDir'"
+    Write-Host " - Seu PATH foi atualizado."
+    Write-Host " - Comandos personalizados 'yt' e 'yt1080' foram adicionados ao seu perfil."
+    Write-Host " - O local de download padrão é '$downloadDir'"
+    Write-Host ""
+    Write-Host "IMPORTANTE: Por favor, REINICIE seu terminal PowerShell para usar os novos comandos." -ForegroundColor Yellow
+    Write-Host "Após reiniciar, você pode simplesmente executar:"
+    Write-Host "  yt <URL_DO_VIDEO>       (para a melhor qualidade disponível)" -ForegroundColor Cyan
+    Write-Host "  yt1080 <URL_DO_VIDEO>   (para qualidade até 1080p)" -ForegroundColor Cyan
+
+
+} catch {
+    Write-Host "`n"
+    Write-Host "❌ Ocorreu um erro:" -ForegroundColor Red
+    Write-Host $_.Exception.Message -ForegroundColor Red
+    Write-Host "A execução do script foi interrompida." -ForegroundColor Red
+} finally {
+    Pause-Script -Message "Pressione Enter para sair."
+}
